@@ -1,6 +1,99 @@
 .screen-heading {
   margin-bottom: 28px;
 }
+.profile-section {
+  margin-top: 26px;
+}
+.profile-fields {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr 1fr;
+  gap: 18px;
+}
+.profile-fields .form-field {
+  align-content: start;
+}
+.profile-section select {
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px;
+  max-width: 350px;
+}
+.researcher-note {
+  background: #142b2b;
+  border-left: 2px solid var(--mint);
+  border-radius: 0 8px 8px 0;
+  padding: 17px 19px;
+  margin: 20px 0;
+}
+.researcher-note p {
+  margin: 8px 0 0;
+  font-size: 0.94rem;
+  line-height: 1.9;
+}
+.share-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin: 18px 0;
+}
+.share-actions a,
+.share-dialog a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+}
+.share-dialog {
+  width: min(640px, calc(100% - 24px));
+}
+.share-dialog > img {
+  display: block;
+  width: 100%;
+  max-height: 60dvh;
+  object-fit: contain;
+}
+.profile-section details {
+  margin-top: 16px;
+}
+.profile-section summary {
+  cursor: pointer;
+  min-height: 44px;
+}
+.profile-section .data-table td {
+  overflow-wrap: anywhere;
+}
+.record-row {
+  flex-wrap: wrap;
+}
+.record-row .share-actions {
+  margin: 0;
+  width: 100%;
+}
+.history-mode {
+  color: var(--mint);
+  font-size: 0.75rem;
+}
+.training-recent {
+  margin-top: 24px;
+}
+@media (max-width: 650px) {
+  .profile-fields {
+    grid-template-columns: 1fr;
+  }
+  .profile-fields .form-field {
+    margin: 8px 0;
+  }
+  .share-actions .secondary {
+    padding: 10px 14px;
+    font-size: 0.8rem;
+  }
+  .profile-section .two-columns {
+    gap: 30px;
+  }
+}
 .screen-heading p {
   color: var(--muted);
   font-size: 0.9rem;

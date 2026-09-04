@@ -21,6 +21,10 @@ export const local = {
 let offset = 0;
 export const serverNow = () => now() + offset;
 export async function api(path, body) {
+  const apiUrl = new URL(
+    path.replace(/^\//, ""),
+    new URL("../", import.meta.url),
+  );
   const fingerprint = path + JSON.stringify(body || {});
   let key;
   if (body) {
@@ -42,7 +46,7 @@ export async function api(path, body) {
   }
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
-      const response = await fetch(path, {
+      const response = await fetch(apiUrl, {
         method: body ? "POST" : "GET",
         credentials: "same-origin",
         headers: {

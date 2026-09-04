@@ -54,7 +54,7 @@ async function readBody(request) {
     throw new GameError("送信内容を確認してください。");
   }
 }
-export async function handleApi(request, db, clock = now) {
+export async function handleApi(request, db, clock = now, cookiePath = "/") {
   const url = new URL(request.url),
     ms = clock();
   let cookie;
@@ -101,7 +101,7 @@ export async function handleApi(request, db, clock = now) {
         data: JSON.stringify(player),
         revision: 0,
       };
-      cookie = `sixth_session=${secret}; Path=/; HttpOnly; SameSite=Strict; Max-Age=31536000${url.protocol === "https:" ? "; Secure" : ""}`;
+      cookie = `sixth_session=${secret}; Path=${cookiePath}; HttpOnly; SameSite=Strict; Max-Age=31536000${url.protocol === "https:" ? "; Secure" : ""}`;
     }
     const headers = cookie ? { "Set-Cookie": cookie } : {};
     const p = JSON.parse(row.data);

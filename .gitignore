@@ -6,3 +6,4 @@ dist/
 .dev.vars*
 worker-configuration.d.ts
 test-results/
+vendor/

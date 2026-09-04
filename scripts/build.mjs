@@ -2,6 +2,7 @@ import { cp, mkdir, readFile, writeFile, readdir } from "node:fs/promises";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 const root = path.resolve(import.meta.dirname, "..");
+await import("./prepare-vendor.mjs");
 for (const dir of ["shared", "js", "worker", "scripts"]) {
   async function check(folder) {
     for (const e of await readdir(folder, { withFileTypes: true })) {
@@ -18,7 +19,7 @@ for (const dir of ["shared", "js", "worker", "scripts"]) {
   await check(path.join(root, dir));
 }
 await mkdir(path.join(root, "dist/data/prisma"), { recursive: true });
-for (const f of ["index.html", "css", "js", "shared", "assets"])
+for (const f of ["index.html", "css", "js", "shared", "assets", "vendor"])
   await cp(path.join(root, f), path.join(root, "dist", f), { recursive: true });
 await cp(
   path.join(root, "data/prisma/catalog.js"),
@@ -26,6 +27,6 @@ await cp(
 );
 await writeFile(
   path.join(root, "dist/_headers"),
-  `/*\n  X-Content-Type-Options: nosniff\n  Referrer-Policy: strict-origin-when-cross-origin\n  Permissions-Policy: camera=(), microphone=(), geolocation=()\n  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'\n`,
+  `/*\n  X-Content-Type-Options: nosniff\n  Referrer-Policy: strict-origin-when-cross-origin\n  Permissions-Policy: camera=(), microphone=(), geolocation=()\n  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'\n`,
 );
 console.log("Build passed. dist contains public assets only.");

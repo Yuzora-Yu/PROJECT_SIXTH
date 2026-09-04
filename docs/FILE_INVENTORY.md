@@ -1,6 +1,6 @@
 # 作成ファイル一覧
 
-変更・作成したファイルは下記の68件です。空リポジトリからの新規作成です。
+初回MVPで作成した68件を下記に記載します。v0.2.0では、末尾の7ファイルを追加し、記録・プロフィール・共有・Cloudflare配信に関わる既存ファイルも更新しました。
 
 - `.github/workflows/ci.yml`
 - `.gitignore`
@@ -72,3 +72,13 @@
 - `wrangler.jsonc`
 
 生成物（dist、node_modules、.local、.wrangler、test-results、worker-configuration.d.ts）はGit管理外です。
+
+## v0.2.0で追加したファイル
+
+- `docs/DEPLOYMENT.md`
+- `js/profile-ui.js`
+- `js/sharing.js`
+- `scripts/prepare-vendor.mjs`
+- `shared/profiles.js`
+- `tests/profiles.spec.js`
+- `tests/profiles.test.mjs`

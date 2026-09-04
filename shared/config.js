@@ -1,9 +1,9 @@
 export const config = Object.freeze({
-  gameVersion: "0.1.0",
+  gameVersion: "0.2.0",
   testVersion: 1,
   particleRuleVersion: 2,
   battleCoreVersion: 1,
-  astrologyRuleVersion: 1,
+  astrologyRuleVersion: 2,
   timezone: "Asia/Tokyo",
   dailyResetHour: 4,
   particle: {

@@ -22,6 +22,13 @@ http
     try {
       const origin = `http://127.0.0.1:${process.env.PORT || 4173}`,
         url = new URL(req.url, origin);
+      if (url.pathname === "/project_sixth") {
+        res.writeHead(308, { Location: "/project_sixth/" });
+        res.end();
+        return;
+      }
+      const scoped = url.pathname.startsWith("/project_sixth/");
+      if (scoped) url.pathname = url.pathname.slice("/project_sixth".length);
       if (url.pathname.startsWith("/api/")) {
         const chunks = [];
         let length = 0;
@@ -41,7 +48,12 @@ http
             ? { body: Buffer.concat(chunks) }
             : {}),
         });
-        const response = await handleApi(request, db);
+        const response = await handleApi(
+          request,
+          db,
+          undefined,
+          scoped ? "/project_sixth/" : "/",
+        );
         res.writeHead(response.status, Object.fromEntries(response.headers));
         res.end(Buffer.from(await response.arrayBuffer()));
         return;
@@ -50,7 +62,7 @@ http
         url.pathname === "/" ? "/index.html" : url.pathname,
       );
       if (
-        !/^\/(index\.html|css\/|js\/|shared\/|assets\/|data\/prisma\/catalog\.js)/.test(
+        !/^\/(index\.html|css\/|js\/|shared\/|assets\/|vendor\/|data\/prisma\/catalog\.js)/.test(
           pathname,
         ) ||
         pathname.includes("..")

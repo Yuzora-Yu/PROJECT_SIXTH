@@ -112,7 +112,7 @@ export function astrology(birthDate) {
     (s, n) => s + Number(n),
     0,
   );
-  while (life > 9)
+  while (life > 9 && ![11, 22, 33].includes(life))
     life = String(life)
       .split("")
       .reduce((s, n) => s + Number(n), 0);

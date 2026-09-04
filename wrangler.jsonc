@@ -7,15 +7,22 @@
   "assets": {
     "directory": "./dist",
     "binding": "ASSETS",
-    "run_worker_first": ["/api/*"],
+    "run_worker_first": true,
+    "html_handling": "none",
+    "not_found_handling": "none",
   },
   "d1_databases": [
     {
       "binding": "DB",
       "database_name": "project-sixth",
-      "database_id": "00000000-0000-0000-0000-000000000000",
+      "database_id": "410a83bb-0907-4ac0-8a1c-110152eba20e",
       "migrations_dir": "migrations",
     },
   ],
   "observability": { "enabled": true, "head_sampling_rate": 0.1 },
+  "account_id": "7e10da8ec857bed20f4b1010952279dd",
+  "routes": [
+    { "pattern": "yu-zora.com/project_sixth", "zone_name": "yu-zora.com" },
+    { "pattern": "yu-zora.com/project_sixth/*", "zone_name": "yu-zora.com" },
+  ],
 }

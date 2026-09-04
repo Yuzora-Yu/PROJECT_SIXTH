@@ -1,6 +1,6 @@
 {
   "name": "project-sixth",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -12,7 +12,10 @@
     "db:local": "wrangler d1 migrations apply project-sixth --local",
     "deploy:check": "npm run build && wrangler deploy --dry-run",
     "test:browser": "playwright test",
-    "format": "prettier --write index.html css js shared worker scripts tests docs/*.md README.md package.json playwright.config.js wrangler.jsonc .github"
+    "format": "prettier --write index.html css js shared worker scripts tests docs/*.md README.md package.json playwright.config.js wrangler.jsonc .github",
+    "predev": "node scripts/prepare-vendor.mjs",
+    "pretest": "node scripts/prepare-vendor.mjs",
+    "deploy": "npm run check && wrangler deploy"
   },
   "engines": {
     "node": ">=24.0.0"
@@ -23,5 +26,8 @@
     "@types/node": "^26.4.1",
     "prettier": "^3.9.6",
     "wrangler": "^4.129.0"
+  },
+  "dependencies": {
+    "astronomy-engine": "2.1.19"
   }
 }

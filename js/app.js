@@ -1,3 +1,12 @@
+import {
+  profilePanels,
+  renderBirthProfile,
+  renderMbti,
+  observedPanel,
+  researcherNote,
+} from "./profile-ui.js";
+import { planetaryProfile, mbtiNotes } from "../shared/profiles.js";
+import { shareButtons } from "./sharing.js";
 import { config } from "../shared/config.js";
 import { dateLabel, astrology, dayKey } from "../shared/core.js";
 import { characters, monsters } from "../data/prisma/catalog.js";
@@ -96,7 +105,10 @@ function render() {
   main.classList.remove("reveal");
   void main.offsetWidth;
   main.classList.add("reveal");
-  if (route === "analyze") renderAstrology();
+  if (route === "analyze") {
+    renderAstrology();
+    renderMbti();
+  }
 }
 function home() {
   const completed = Object.values(player?.dailyStatus || {}).filter(
@@ -130,7 +142,7 @@ function labPage(training) {
         const records = list.filter(
           (r) => r.testId === l.id && r.testVersion === version,
         );
-        return `<section class="panel lab-row"><span class="test-icon" aria-hidden="true">${l.icon}</span><div><span class="eyebrow">LAB 0${i + 1} / ${l.sub}</span><h2>${l.name}</h2><p>${l.desc}</p><div class="lab-meta"><span>${l.time}</span><span>${l.sense}</span><span>${training ? `記録 ${records.length} 回` : done ? "✓ 本日完了" : "+10 RC"}</span></div>${training && records.length ? `<small class="muted">自己ベスト ${Math.max(local.get(`training-best:v${version}`, {})[l.id] || 0, ...records.map((r) => r.score ?? Number(r.correct)))} / 直近平均 ${(records.reduce((s, r) => s + (r.score ?? Number(r.correct)), 0) / records.length).toFixed(1)}</small>` : ""}</div>${button(training ? "訓練を始める　→" : done ? "結果を見る" : "試験を始める　→", `${training ? "training" : "daily"}-${l.id}`, done ? "secondary" : "primary")}</section>`;
+        return `<section class="panel lab-row"><span class="test-icon" aria-hidden="true">${l.icon}</span><div><span class="eyebrow">LAB 0${i + 1} / ${l.sub}</span><h2>${l.name}</h2><p>${l.desc}</p><div class="lab-meta"><span>${l.time}</span><span>${l.sense}</span><span>${training ? `記録 ${records.length} 回` : done ? "✓ 本日完了" : "+10 RC"}</span></div>${training && records.length ? `<small class="muted">自己ベスト ${Math.max(local.get(`training-best:v${version}`, {})[l.id] || 0, ...records.map((r) => r.score ?? Number(r.correct)))} / 直近平均 ${(records.reduce((s, r) => s + (r.score ?? Number(r.correct)), 0) / records.length).toFixed(1)}<br>直近の記録：${new Intl.DateTimeFormat("ja-JP", { timeZone: config.timezone, month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit", second: "2-digit" }).format(Date.parse(records.at(-1).finishedAt))} JST / ${records.at(-1).score ?? Number(records.at(-1).correct)}</small>` : ""}</div>${button(training ? "訓練を始める　→" : done ? "結果を見る" : "試験を始める　→", `${training ? "training" : "daily"}-${l.id}`, done ? "secondary" : "primary")}</section>`;
       })
       .join("")}</div>`
   );
@@ -165,7 +177,7 @@ function characterDetail(id) {
     o = player?.characters[id];
   modal(
     c.name,
-    `<div class="character-detail"><div><img class="character-art" src="${c.image}" alt="${c.name}"><p class="muted">${c.job} · 得意な第六感：${config.labels[c.primarySense]}</p></div><div><span class="eyebrow">CHARACTER AFFINITY</span>${radar(c.senseAffinity, "キャラクター固有適性")}<p class="small muted">キャラクター固有の適性です。被験者本人の研究値とは別に保持されます。</p>${o ? `<p>LV.${1 + Math.floor(o.exp / 60)}　EXP ${o.exp % 60} / 60<br>育成の欠片 ${o.shards} 個</p><div class="actions">${button("プロフィールに設定", `icon-${id}`)}${button("欠片10個で育成", `awaken-${id}`, "secondary", o.shards < 10 ? "disabled" : "")}</div>` : '<p class="muted">このキャラクターはまだ取得していません。</p>'}</div></div>`,
+    `<div class="character-detail"><div><img class="character-art" src="${c.image}" alt="${c.name}"><p class="muted">${c.job} · 得意な第六感：${config.labels[c.primarySense]}</p></div><div><span class="eyebrow">CHARACTER AFFINITY</span>${radar(c.senseAffinity, "キャラクター固有適性")}<p class="small muted">キャラクター固有の適性です。被験者本人の研究値とは別に保持されます。</p>${o ? `<p>LV.${1 + Math.floor(o.exp / 60)}　EXP ${o.exp % 60} / 60<br>育成の欠片 ${o.shards} 個</p><div class="actions">${button("プロフィールに設定", `icon-${id}`)}${button("欠片10個で育成", `awaken-${id}`, "secondary", o.shards < 10 ? "disabled" : "")}</div>` : '<p class="muted">このキャラクターはまだ取得していません。</p>'}</div></div>${o ? shareButtons({ title: `${c.name} / キャラクター適性`, summary: `${c.job}・得意な第六感：${config.labels[c.primarySense]}`, stats: c.senseAffinity, comment: "仲間の適性と、君自身の研究値は別の記録だ。組み合わせを変えて試してみよう。" }) : ""}`,
     "SUBJECT FILE",
   );
 }
@@ -224,15 +236,30 @@ async function runBattle() {
       if (i >= r.turns.length) {
         clearInterval(interval);
         document.querySelector("#battle-finish").innerHTML =
-          `<div class="result-banner"><h3>${r.win ? "実証成功" : "実験終了"}</h3><p>${r.rc} RC / ${r.exp} EXP</p>${button("結果を保存する", `battle-finish-${b.id}`)}</div>`;
+          `<div class="result-banner"><h3>${r.win ? "実証成功" : "実験終了"}</h3><p>${r.rc} RC / ${r.exp} EXP</p>${button("結果を保存する", `battle-finish-${b.id}`)}</div>${shareButtons({ title: "能力実証試験", summary: `${c.name} / ${r.win ? "実証成功" : "実験終了"}・${r.rc} RC・${r.exp} EXP`, comment: "今回の戦闘記録を受け取った。研究値の変化があれば、次の実験とも比べてみよう。" })}`;
       }
     },
     matchMedia("(prefers-reduced-motion: reduce)").matches ? 100 : 420,
   );
   setCleanup(() => clearInterval(interval));
 }
+function xpTrend(history) {
+  return (
+    "<h3>直近30試験の獲得XP</h3>" +
+    (history.length
+      ? `<div class="trend" role="img" aria-label="直近30試験の獲得XP">${history
+          .slice(-30)
+          .map((h) => {
+            const xp = Object.values(h.xp || {}).reduce((a, b) => a + b, 0);
+            return `<div class="bar" style="height:${Math.min(100, xp * 3)}%" title="${escape(h.dateJst)}: ${xp} XP"></div>`;
+          })
+          .join("")}</div>`
+      : '<p class="muted small">Daily試験を受けると、ここに記録が蓄積されます。</p>')
+  );
+}
 function analyzePage() {
   const history = player?.history || [],
+    training = local.get("training", []),
     cards = history.filter((h) => h.testId === "card"),
     hits = cards.filter((h) => h.correct).length,
     particles = history.filter((h) => h.testId === "particle"),
@@ -241,47 +268,56 @@ function analyzePage() {
     intro(
       "ANALYZE",
       "被験結果解析",
-      "成長した研究値と、実際のプレイ成績を見比べる。",
+      "研究値、実際の成績、自己申告のプロフィールを、それぞれの記録として読む。",
     ) +
-    `<div class="two-columns"><section class="panel"><span class="eyebrow">OBSERVED PROFILE</span><h2>ゲーム内研究値</h2>${player ? radar(player.senseStats) : "<p>記録は接続後に表示されます。</p>"}<p class="small muted">参加と成功で育つ研究値です。実際の能力を示す偏差値ではありません。</p></section><section class="panel"><span class="eyebrow">PLAY RECORD</span><h2>測定成績</h2><table class="data-table"><thead><tr><th>試験</th><th>試行数</th><th>実測結果</th></tr></thead><tbody><tr><td>★カード</td><td>${cards.length}</td><td>${cards.length ? ((hits / cards.length) * 100).toFixed(1) + "% 的中" : "—"}</td></tr><tr><td>粒子観測</td><td>${particles.length}</td><td>${particles.length ? (particles.reduce((s, h) => s + h.found, 0) / particles.length).toFixed(1) + " / 16 発見" : "—"}</td></tr><tr><td>潜在法則</td><td>${patterns.length}</td><td>${patterns.length ? (patterns.reduce((s, h) => s + h.correct, 0) / patterns.length).toFixed(1) + " / 5 正解" : "—"}</td></tr></tbody></table><p class="small muted">★カードの理論的中率は20%。少ない試行数では大きく変動します。</p><h3>直近30試験の獲得XP</h3>${
-      history.length
-        ? `<div class="trend" role="img" aria-label="直近30試験の獲得XP">${history
-            .slice(-30)
-            .map(
-              (h) =>
-                `<div class="bar" style="height:${Math.min(100, Object.values(h.xp).reduce((a, b) => a + b, 0) * 3)}%" title="${h.dateJst}: ${Object.values(h.xp).reduce((a, b) => a + b, 0)} XP"></div>`,
-            )
-            .join("")}</div>`
-        : '<p class="muted small">試験を受けると、ここに記録が蓄積されます。</p>'
-    }</section></div><section class="panel" style="margin-top:22px"><span class="eyebrow">ENTERTAINMENT PROFILE</span><h2>星と数字のプロフィール</h2><p class="small muted">星座・数秘を基にした娯楽用のルール表です。出生情報はこの端末だけに保存し、サーバーへ送信しません。</p><div class="two-columns"><div><label class="form-field">生年月日（任意）<input type="date" id="birth-date" value="${escape(local.get("birth", ""))}" max="${new Date(serverNow() + 9 * 3600000).toISOString().slice(0, 10)}"></label><div class="actions">${button("プロフィールを見る", "astrology")}${button("出生情報を削除", "birth-clear", "text-button")}</div></div><div id="astrology-result"></div></div></section>`
+    `<div class="two-columns"><section class="panel"><span class="eyebrow">OBSERVED PROFILE</span><h2>ゲーム内研究値</h2>${player ? radar(player.senseStats) + observedPanel(player) : "<p>記録は接続後に表示されます。</p>"}</section><section class="panel"><span class="eyebrow">DAILY RECORD</span><h2>Dailyの測定成績</h2><table class="data-table"><thead><tr><th>試験</th><th>試行数</th><th>実測結果</th></tr></thead><tbody><tr><td>★カード</td><td>${cards.length}</td><td>${cards.length ? ((hits / cards.length) * 100).toFixed(1) + "% 的中" : "—"}</td></tr><tr><td>粒子観測</td><td>${particles.length}</td><td>${particles.length ? (particles.reduce((s, h) => s + h.found, 0) / particles.length).toFixed(1) + " / 16 発見" : "—"}</td></tr><tr><td>潜在法則</td><td>${patterns.length}</td><td>${patterns.length ? (patterns.reduce((s, h) => s + h.correct, 0) / patterns.length).toFixed(1) + " / 5 正解" : "—"}</td></tr></tbody></table><p class="small muted">★カードの理論的中率は20%。少ない試行数では大きく変動します。</p>${xpTrend(history)}<h3>訓練の記録</h3><p class="small muted">直近保存 ${training.length} 回。訓練はDaily成績・研究値へ加算しません。</p><div class="actions">${button("過去の記録を見る", "archive", "secondary")}${button("トレーニングへ", "training", "text-button")}</div></section></div>` +
+    profilePanels()
   );
 }
 function renderAstrology() {
-  const birth = local.get("birth");
-  if (!birth) return;
   try {
-    const a = astrology(birth);
-    document.querySelector("#astrology-result").innerHTML =
-      `<h3>${a.zodiac} / 数秘 ${a.life}</h3>${radar(a.stats, "娯楽用占術プロフィール")}<p class="small muted">占術の値は研究値や戦闘へ反映されません。</p>`;
-  } catch {}
+    renderBirthProfile();
+  } catch (error) {
+    const target = document.querySelector("#astrology-result");
+    if (target) target.textContent = error.message;
+  }
 }
 function archivePage() {
-  const h = player?.history || [];
+  const daily = (player?.history || []).map((r) => ({ ...r, mode: "Daily" })),
+    training = local.get("training", []).map((r) => ({ ...r, mode: "訓練" }));
+  const records = [...daily, ...training]
+    .sort((a, b) => Date.parse(b.finishedAt) - Date.parse(a.finishedAt))
+    .slice(0, 90);
   return (
     intro(
       "OBSERVATION LOG",
       "観測記録",
-      "これまでに完了したDailyの記録。粒子試験は答え合わせを再生できます。",
+      "Dailyと訓練の記録。終了した試行は、その場でここへ反映されます。",
     ) +
-    (h.length
-      ? `<div class="record-list">${[...h]
-          .reverse()
-          .map(
-            (r) =>
-              `<div class="record-row"><div><small>${r.dateJst} · v${r.testVersion}</small><br><b>${labs.find((l) => l.id === r.testId)?.name}</b></div><div><small>${Object.values(r.xp).reduce((a, b) => a + b, 0)} XP / +${r.rc} RC</small>${r.testId === "particle" ? button("再生", `replay-${r.attemptId}`, "text-button") : ""}</div></div>`,
-          )
+    (records.length
+      ? `<div class="record-list">${records
+          .map((r) => {
+            const name = labs.find((l) => l.id === r.testId)?.name || "観測";
+            const summary =
+              r.testId === "card"
+                ? r.correct
+                  ? "★を発見"
+                  : "今回は不的中"
+                : r.testId === "particle"
+                  ? `${r.found ?? r.score / 10} / 16 発見`
+                  : `${r.correct ?? r.score} / 5 正解`;
+            const date = new Intl.DateTimeFormat("ja-JP", {
+              timeZone: config.timezone,
+              month: "numeric",
+              day: "numeric",
+              hour: "2-digit",
+              minute: "2-digit",
+              second: "2-digit",
+            }).format(Date.parse(r.finishedAt));
+            return `<section class="record-row"><div><span class="history-mode">${r.mode}</span><small> · ${date} JST · v${r.testVersion}</small><br><b>${name}</b><p class="small muted">${summary}</p></div><div>${r.mode === "Daily" ? `<small>${Object.values(r.xp || {}).reduce((a, b) => a + b, 0)} XP / +${r.rc} RC</small>` : '<small class="muted">恒久XP・RCへの反映なし</small>'}${r.testId === "particle" && r.seed !== undefined ? button("再生", `replay-record-${r.attemptId || r.id}`, "text-button") : ""}</div>${shareButtons({ title: r.mode + " / " + name, summary, comment: "今回の記録を受け取った。次の観測と、あとで並べて見てみよう。" })}</section>`;
+          })
           .join("")}</div>`
-      : '<div class="empty-state"><h2>まだ観測記録がありません。</h2><p class="muted">最初のDailyから始めましょう。</p></div>') +
+      : '<div class="empty-state"><h2>まだ観測記録がありません。</h2><p class="muted">最初の試験から始めましょう。</p></div>') +
     `<div class="future-strip"><span>予測記録カレンダー</span>${button("開発中", "coming", "secondary", 'aria-disabled="true"')}</div>`
   );
 }
@@ -307,6 +343,27 @@ function welcome() {
   local.set("welcomed", true);
 }
 async function action(name) {
+  if (name.startsWith("replay-record-")) {
+    const id = name.slice(14);
+    const h = [...(player?.history || []), ...local.get("training", [])].find(
+      (r) => (r.attemptId || r.id) === id,
+    );
+    if (h) replayParticles(h.seed, h);
+    return;
+  }
+  if (name === "mbti-save") {
+    const value = document.querySelector("#mbti-type").value;
+    if (value && !mbtiNotes[value]) throw Error("タイプを確認してください。");
+    local.set("mbti", value || null);
+    renderMbti();
+    return;
+  }
+  if (name === "mbti-clear") {
+    local.set("mbti", null);
+    document.querySelector("#mbti-type").value = "";
+    renderMbti();
+    return;
+  }
   if (navs.some((n) => n[0] === name)) {
     location.hash = name;
     return;
@@ -415,15 +472,22 @@ async function action(name) {
   if (name === "astrology") {
     const value = document.querySelector("#birth-date").value;
     astrology(value);
+    const birthTime = document.querySelector("#birth-time").value;
+    const offset = Number(document.querySelector("#birth-offset").value);
+    planetaryProfile(value, birthTime, offset);
     if (!local.set("birth", value))
       throw new Error(
         "端末への保存ができません。ブラウザ設定を確認してください。",
       );
+    local.set("birth-time", birthTime);
+    local.set("birth-offset", offset);
     renderAstrology();
     return;
   }
   if (name === "birth-clear") {
     local.set("birth", null);
+    local.set("birth-time", null);
+    local.set("birth-offset", null);
     render();
     toast("この端末の出生情報を削除しました。");
     return;
@@ -532,3 +596,5 @@ setInterval(() => {
   )
     void connect();
 }, 30000);
+
+document.addEventListener("sixth:training-saved", () => render());

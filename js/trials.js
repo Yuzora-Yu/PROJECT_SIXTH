@@ -1,3 +1,6 @@
+import { shareButtons } from "./sharing.js";
+import { trialComment } from "../shared/profiles.js";
+import { researcherNote } from "./profile-ui.js";
 import { config } from "../shared/config.js";
 import {
   newSeed,
@@ -28,6 +31,8 @@ function recordTraining(testId, result) {
   const others = all.filter((r) => r.testId !== testId),
     own = all.filter((r) => r.testId === testId);
   own.push({
+    ...result,
+    id: crypto.randomUUID(),
     testId,
     finishedAt: iso(serverNow()),
     testVersion: version,
@@ -36,6 +41,7 @@ function recordTraining(testId, result) {
   });
   if (!local.set("training", [...others, ...own.slice(-30)]))
     toast("端末への訓練記録保存ができません。");
+  document.dispatchEvent(new CustomEvent("sixth:training-saved"));
 }
 function reward(result, daily) {
   return daily
@@ -116,7 +122,7 @@ function cardTest(daily, mutate, started) {
             c.innerHTML = `${i === answer ? "★" : "·"}<small>${i === selectedIndex ? "あなたの選択" : String(i + 1).padStart(2, "0")}</small>`;
           });
           document.querySelector("#card-result").innerHTML =
-            `<div class="result-banner"><h3>${r.correct ? "感応を記録しました。" : "今回は、別のカードでした。"}</h3><p>★はカード ${answer + 1} にありました。</p>${reward(r, daily)}</div><div class="actions">${button("訓練でもう一度", "training-card", "secondary")}${button("閉じる", "close", "text-button")}</div>`;
+            `<div class="result-banner"><h3>${r.correct ? "感応を記録しました。" : "今回は、別のカードでした。"}</h3><p>★はカード ${answer + 1} にありました。</p>${reward(r, daily)}</div>${resultExtras("card", r, daily)}<div class="actions">${button("訓練でもう一度", "training-card", "secondary")}${button("閉じる", "close", "text-button")}</div>`;
         } catch (e) {
           done = false;
           document
@@ -196,7 +202,7 @@ function patternTest(daily, mutate, started) {
               if (!daily) recordTraining("pattern", result);
               modal(
                 "潜在法則の観測結果",
-                `<div class="result-metrics"><div class="metric"><b>${result.correct} / 5</b><span>正解数</span></div><div class="metric"><b>${(answers.reduce((s, a) => s + a.reactionMs, 0) / 5000).toFixed(2)}秒</b><span>平均回答時間</span></div></div>${reward(result, daily)}<table class="data-table"><thead><tr><th>問</th><th>結果</th><th>潜んでいた法則</th></tr></thead><tbody>${result.details.map((d, i) => `<tr><td>${i + 1}</td><td>${d.correct ? "✓ 正解" : "—"} ${symbols[d.answer]}</td><td>${d.rule}</td></tr>`).join("")}</tbody></table><div class="actions" style="margin-top:20px">${button("閉じる", "close")}${button("訓練でもう一度", "training-pattern", "secondary")}</div>`,
+                `<div class="result-metrics"><div class="metric"><b>${result.correct} / 5</b><span>正解数</span></div><div class="metric"><b>${(answers.reduce((s, a) => s + a.reactionMs, 0) / 5000).toFixed(2)}秒</b><span>平均回答時間</span></div></div>${reward(result, daily)}${resultExtras("pattern", result, daily)}<table class="data-table"><thead><tr><th>問</th><th>結果</th><th>潜んでいた法則</th></tr></thead><tbody>${result.details.map((d, i) => `<tr><td>${i + 1}</td><td>${d.correct ? "✓ 正解" : "—"} ${symbols[d.answer]}</td><td>${d.rule}</td></tr>`).join("")}</tbody></table><div class="actions" style="margin-top:20px">${button("閉じる", "close")}${button("訓練でもう一度", "training-pattern", "secondary")}</div>`,
               );
             } catch (e) {
               toast(e.message);
@@ -376,10 +382,10 @@ async function particleTest(daily, mutate) {
             })
           ).result
         : scoreParticles(seed, taps);
-      if (!daily) recordTraining("particle", r);
+      if (!daily) recordTraining("particle", { ...r, seed, taps });
       modal(
         "粒子観測の結果",
-        `<div class="result-metrics"><div class="metric"><b>${r.found} / 16</b><span>発見した異常</span></div><div class="metric"><b>${r.falsePositives}</b><span>誤検知</span></div><div class="metric"><b>${r.meanReactionMs === null ? "—" : (r.meanReactionMs / 1000).toFixed(2) + "秒"}</b><span>平均発見時間</span></div></div>${reward(r, daily)}<p class="small muted">予兆発見 ${r.hits.filter((h) => h.leadMs > 0).length} / 4 · 異質発見 ${r.hits.filter((h) => h.type === "hidden-rule").length} / 2</p><div class="actions"><button class="primary" id="particle-replay">答え合わせを見る</button>${button("閉じる", "close", "secondary")}</div>`,
+        `<div class="result-metrics"><div class="metric"><b>${r.found} / 16</b><span>発見した異常</span></div><div class="metric"><b>${r.falsePositives}</b><span>誤検知</span></div><div class="metric"><b>${r.meanReactionMs === null ? "—" : (r.meanReactionMs / 1000).toFixed(2) + "秒"}</b><span>平均発見時間</span></div></div>${reward(r, daily)}${resultExtras("particle", r, daily)}<p class="small muted">予兆発見 ${r.hits.filter((h) => h.leadMs > 0).length} / 4 · 異質発見 ${r.hits.filter((h) => h.type === "hidden-rule").length} / 2</p><div class="actions"><button class="primary" id="particle-replay">答え合わせを見る</button>${button("閉じる", "close", "secondary")}</div>`,
       );
       document.querySelector("#particle-replay").onclick = () =>
         replayParticles(seed, r);
@@ -448,4 +454,31 @@ export function replayParticles(seed, result) {
   };
   setCleanup(() => clearInterval(timer));
   draw();
+}
+
+function resultExtras(test, result, daily) {
+  const title =
+    (daily ? "Daily" : "訓練") +
+    " / " +
+    { card: "★カード感応", particle: "粒子観測", pattern: "潜在法則" }[test];
+  const summary =
+    test === "card"
+      ? result.correct
+        ? "★を発見"
+        : "今回は不的中"
+      : test === "particle"
+        ? `${result.found} / 16 発見・誤検知 ${result.falsePositives}`
+        : `${result.correct} / 5 正解`;
+  const comment = trialComment(test, result);
+  return (
+    researcherNote(comment) +
+    shareButtons({
+      title,
+      summary,
+      comment,
+      note: daily
+        ? "Dailyの測定記録。能力の科学的な証明ではありません。"
+        : "トレーニングの記録。恒久XP・RCへの反映はありません。",
+    })
+  );
 }
