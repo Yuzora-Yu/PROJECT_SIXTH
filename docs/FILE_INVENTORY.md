@@ -96,21 +96,27 @@
 - `tests/particle-feedback.test.mjs`: 即時判定と最終採点の一致・境界判定
 - `tests/particle-feedback.spec.js`: PCとスマホ幅の入力・表示・保存
 
-## 2026-09-04 現実予測運用設計で追加
+## 2026-09-04 現実予測運用設計で追加（release 2.1.0）
 
 - `docs/GEMINI_SPARK_OPERATIONS.md`
 - `docs/PREDICTION_SOURCE_POLICY.md`
-- `ops/PROJECT_SIXTH_GeminiSpark_Prediction_Ops.xlsx`
+- `docs/OPERATIONS.md`
+- `ops/PROJECT_SIXTH_GeminiSpark_Prediction_Ops.xlsx` — canonical workbook base
+- `spreadsheet/PROJECT_SIXTH_GeminiSpark_Prediction_Ops_v2.xlsx` — compatibility mirror
 - `gemini-spark/README.md`
-- `gemini-spark/tasks/TASKS.md`
-- `gemini-spark/skills/collect-prediction-candidates/SKILL.md`
-- `gemini-spark/skills/draft-prediction-question/SKILL.md`
-- `gemini-spark/skills/audit-prediction-question/SKILL.md`
-- `gemini-spark/skills/approve-prediction-publication/SKILL.md`
-- `gemini-spark/skills/verify-prediction-result-primary/SKILL.md`
-- `gemini-spark/skills/verify-prediction-result-secondary/SKILL.md`
-- `gemini-spark/skills/settle-prediction-result/SKILL.md`
-- `gemini-spark/packages/*.zip`（上記7 SkillのGemini Spark登録用ZIP）
+- `gemini-spark/ops_contract.json`
+- `gemini-spark/tasks/TASKS.md` — task index / schedule
+- `gemini-spark/tasks/T01_collect_prediction_candidates.md`
+- `gemini-spark/tasks/T02_draft_prediction_question.md`
+- `gemini-spark/tasks/T03_audit_prediction_question.md`
+- `gemini-spark/tasks/T04_approve_prediction_publication.md`
+- `gemini-spark/tasks/T05_verify_result_primary.md`
+- `gemini-spark/tasks/T06_verify_result_secondary.md`
+- `gemini-spark/tasks/T07_settle_prediction_result.md`
+- `gemini-spark/tasks/T08_collect_major_events_optional.md` — optional
+- `gemini-spark/skills/*/SKILL.md` — 7 Skills readable source
+- `gemini-spark/packages/*.zip` — 7 Gemini Spark upload packages
+- `spark/` — compatibility mirror of task/skill/contract files
 
 予測ゲーム本体コードとGitHub Actionsはこの段階では未実装。
 

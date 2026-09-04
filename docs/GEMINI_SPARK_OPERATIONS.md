@@ -1,7 +1,7 @@
 # Gemini Spark 運用仕様 — Reality Prediction Ops
 
 確認日: 2026-09-04  
-対象: PROJECT SIXTH 現実予測運用
+対象: PROJECT SIXTH 現実予測運用  /  release 2.1.0  /  schema 2.0.0
 
 ## 1. この文書の目的
 
@@ -16,6 +16,7 @@ Gemini Spark をバックオフィスの運用エージェントとして使い�
 - Task = 何をするか、Schedule = いつ実行するか、Skill = どう処理するか、の役割分離で設計する。
 - 利用要件は現時点で、18歳以上、個人Googleアカウント、Google AI ProまたはUltra、Gemini Apps Activityオン。仕事/学校アカウントは非対応。
 - 時間ベース Schedule は hourly を含む。クラウド実行のため端末がオフでも予定実行される。
+- 本プロジェクトで確認した hourly の分指定は `:00 / :15 / :30 / :45` の4枠。この4枠だけを正規Scheduleとして使う。
 - 有効な Schedule の上限は50。今回のT01〜T07+任意T08は上限内。
 - Topic Monitorも利用できるが、高頻度に変動するデータや緊急性の高い追跡にはまだ最適化されていない。
 - 実行時刻は厳密保証ではない。混雑等で遅延しうる。
@@ -38,7 +39,7 @@ Gemini Spark をバックオフィスの運用エージェントとして使い�
 
 ### 3.1 時刻順に依存しない
 
-T01 を :02、T02 を :10 のように分散しても、Spark の実行時刻は厳密ではない。したがって「前の task が終わったから次を実行する」依存は禁止する。
+T01/T05を`:00`、T02/T06を`:15`、T03/T07を`:30`、T04を`:45`へ配置する。ただし Spark の実行時刻は厳密ではないため、「前の task が終わったから次を実行する」依存は禁止する。
 
 各 task は Sheet の `status` / `gate` を見て、自分が処理可能な行だけを拾う。
 
@@ -107,17 +108,17 @@ T01/T02 が有用な新規サイトを発見しても、直接 `SOURCE_MASTER` �
 
 | Task | Skill | 役割 | 毎時予定 |
 |---|---|---|---|
-| T01 | `collect-prediction-candidates` | 問題案収集 | :02 |
-| T02 | `draft-prediction-question` | 選定・加筆・選択肢・解決ルール | :10 |
-| T03 | `audit-prediction-question` | 公開前独立監査 + source候補検証 | :18 |
-| T04 | `approve-prediction-publication` | 公開最終判定 | :26 |
-| T05 | `verify-prediction-result-primary` | 結果確認1 | :36 |
-| T06 | `verify-prediction-result-secondary` | 結果確認2 | :43 |
-| T07 | `settle-prediction-result` | 二重確認の監査・最終確定 | :51 |
+| T01 | `collect-prediction-candidates` | 問題案収集 | :00 |
+| T02 | `draft-prediction-question` | 選定・加筆・選択肢・解決ルール | :15 |
+| T03 | `audit-prediction-question` | 公開前独立監査 + source候補検証 | :30 |
+| T04 | `approve-prediction-publication` | 公開最終判定 | :45 |
+| T05 | `verify-prediction-result-primary` | 結果確認1 | :00 |
+| T06 | `verify-prediction-result-secondary` | 結果確認2 | :15 |
+| T07 | `settle-prediction-result` | 二重確認の監査・最終確定 | :30 |
 
-上記の分設定は負荷分散用であり依存関係ではない。
+同じ時刻のTask同士にも順序依存はない。`status` / `gate` だけを工程順の根拠にする。
 
-任意 T08 は大型イベント早期収集。毎時ではなく daily 06:20 または Topic Monitor を推奨し、1週間〜12か月先の大会、授賞式、発表予定などを `EVENT_WATCH` へ置く。T08 自体は問題を公開しない。
+任意 T08 は大型イベント早期収集。daily `06:45` JST とし、1週間〜12か月先の大会、授賞式、発表予定などを `EVENT_WATCH` へ置く。T08 自体は問題を公開しない。
 
 ## 5. Google Sheet
 
@@ -204,12 +205,18 @@ Spark の共有 Sheet 編集に確認が入る可能性があるため、次の�
 - 報酬・経済値を Gemini に創作させない。
 
 
-## 固定Spreadsheet（v1.1.0）
+## 固定Spreadsheet（release 2.1.0）
 
 Gemini Spark の予測運用は次の個人所有Google Sheetだけを正本として扱う。
 
 - Spreadsheet ID: `1ZGb__FQT25BPkzovq2UTfO4clvE7G71PiRm3yywSj6Y`
-- Entry URL: `https://docs.google.com/spreadsheets/d/1ZGb__FQT25BPkzovq2UTfO4clvE7G71PiRm3yywSj6Y/edit?gid=1764421078#gid=1764421078`
 - Base URL: `https://docs.google.com/spreadsheets/d/1ZGb__FQT25BPkzovq2UTfO4clvE7G71PiRm3yywSj6Y/edit`
+- Contract: `PROJECT_SIXTH_PREDICTION_OPS`
+- Schema: `2.0.0`
+- Release: `2.1.0`
+- Timezone: `Asia/Tokyo`
+- GID dependency: `NONE`
 
-全Skill/TaskはURLを内包する。Drive上の似た名前のSheetを検索・代替してはならない。アクセス不能、`05_CONFIG` の `schema_version` 不一致、必要タブ欠落時はfail closedとし、別Sheetを作成・編集しない。`gid` は入口に過ぎず、処理対象タブは名前で指定する。
+全Skill/Taskはこのbase URLを内包する。Drive上の似た名前のSheetを検索・代替してはならない。アクセス不能、`05_CONFIG` のcontract/schema不一致、必要タブ欠落時はfail closedとし、別Sheetを作成・編集しない。`gid` は参照・契約に使用せず、処理対象タブはexact tab nameで指定する。
+
+Task本文は `gemini-spark/tasks/` の個別Markdownを登録用正本とする。Skill本文は `gemini-spark/skills/`、登録ZIPは `gemini-spark/packages/` を正本とする。静的QAはrelease 2.1.0で89/89 PASS済み。次の境界はGemini Spark実行時検証。

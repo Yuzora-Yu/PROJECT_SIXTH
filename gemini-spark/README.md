@@ -1,37 +1,55 @@
-# Gemini Spark agents for PROJECT SIXTH
+# Gemini Spark — PROJECT SIXTH Prediction Ops
 
-このディレクトリは、現実予測のバックオフィス運用を Gemini Spark へ引き継ぐための登録原本。
+Current validated release: **2.1.0**  
+Contract: `PROJECT_SIXTH_PREDICTION_OPS` / schema `2.0.0`
 
-## 構成
+## Fixed production Spreadsheet
 
-- `skills/*/SKILL.md`: 7個のSkill原本
-- `packages/*.zip`: Gemini SparkへアップロードするSkill package
-- `tasks/TASKS.md`: Task prompt と Schedule
-- `../ops/PROJECT_SIXTH_GeminiSpark_Prediction_Ops.xlsx`: 編集・監査用Sheet原本
-- `../docs/GEMINI_SPARK_OPERATIONS.md`: 全体運用仕様
-- `../docs/PREDICTION_SOURCE_POLICY.md`: 情報源ポリシー
+- Spreadsheet ID: `1ZGb__FQT25BPkzovq2UTfO4clvE7G71PiRm3yywSj6Y`
+- Base URL: `https://docs.google.com/spreadsheets/d/1ZGb__FQT25BPkzovq2UTfO4clvE7G71PiRm3yywSj6Y/edit`
+- Timezone: `Asia/Tokyo`
+- GID dependency: `NONE`
 
-## 登録順
+All Skills and Tasks must use the base URL above. Do not use a `gid=` URL, search for a similarly named workbook, or create a fallback workbook. If the fixed Sheet is inaccessible or the contract/schema is wrong, fail closed.
 
-1. 本番管理Sheetは Spreadsheet ID `1ZGb__FQT25BPkzovq2UTfO4clvE7G71PiRm3yywSj6Y` / `https://docs.google.com/spreadsheets/d/1ZGb__FQT25BPkzovq2UTfO4clvE7G71PiRm3yywSj6Y/edit?gid=1764421078#gid=1764421078` に固定済み。
-2. `packages/*.zip` を Gemini Spark Skills に登録。Skill v1.1.0 はこのSheet URLを内包する。
-3. 各Taskも同じ固定Sheet URLを明記する。
-4. `TASKS.md` の T01〜T07 を作成。
-5. 各 Task をまず `Run now` でテストし、担当列以外を変更していないことを確認。
-6. Schedule を設定。
-7. T08 は任意。最初は daily で十分。
+## 7 Skills
 
-## 不変条件
+Readable sources: `skills/<skill-name>/SKILL.md`  
+Gemini Spark upload packages: `packages/<skill-name>.zip`
 
-- Task本文は短く、詳細はSkillへ置く。
-- Skillは担当列を限定する。
-- 不明ならHOLD。
-- RUN_LOG/AUDIT_LOGを消さない。
-- 時刻順に依存しない。
-- GitHub Actionsはgate=READYしか読まない。
+1. `collect-prediction-candidates`
+2. `draft-prediction-question`
+3. `audit-prediction-question`
+4. `approve-prediction-publication`
+5. `verify-prediction-result-primary`
+6. `verify-prediction-result-secondary`
+7. `settle-prediction-result`
 
-## 固定Spreadsheet
+Each package is version `2.1.0` and contains root `SKILL.md`.
 
-- ID: `1ZGb__FQT25BPkzovq2UTfO4clvE7G71PiRm3yywSj6Y`
-- URL: `https://docs.google.com/spreadsheets/d/1ZGb__FQT25BPkzovq2UTfO4clvE7G71PiRm3yywSj6Y/edit?gid=1764421078#gid=1764421078`
-- Skill/TaskはこのSheet以外を操作しない。アクセス不能・schema不一致時はfail closed。
+## Tasks / Schedule
+
+Individual copy/paste Task definitions are in `tasks/` using ASCII filenames.
+
+| Time (JST) | Tasks |
+|---|---|
+| every hour `:00` | T01 / T05 |
+| every hour `:15` | T02 / T06 |
+| every hour `:30` | T03 / T07 |
+| every hour `:45` | T04 |
+| daily `06:45` | T08 optional event watch |
+
+Same-slot tasks do not wait for each other. Workflow order is controlled only by Spreadsheet `status` / `gate`.
+
+## Repository mirrors
+
+`gemini-spark/` is the canonical readable copy. The existing `spark/` tree is kept as a compatibility mirror and is overwritten with the same Skills/Tasks/contract in this release. Do not edit the two trees independently.
+
+## Base workbook
+
+- Canonical repository path: `ops/PROJECT_SIXTH_GeminiSpark_Prediction_Ops.xlsx`
+- Legacy mirror: `spreadsheet/PROJECT_SIXTH_GeminiSpark_Prediction_Ops_v2.xlsx`
+
+Both contain the same validated release 2.1.0 workbook.
+
+Static QA boundary: complete (89/89 PASS). Next boundary is Gemini Spark runtime verification.

@@ -1,42 +1,61 @@
-# PROJECT SIXTH Prediction Ops — Canonical Operations v2.0.0
+# PROJECT SIXTH Prediction Ops — Canonical Operations v2.1.0
 
-この配布物は、Spreadsheet / Gemini Spark Skills / Tasks / GAS を **同じcontract** から生成した整合版。
+Spreadsheet / Gemini Spark Skills / Tasks / GAS は同じcontractで運用する。
 
 ## Single source of truth
 
 - contract_id: `PROJECT_SIXTH_PREDICTION_OPS`
 - schema_version: `2.0.0`
+- release_version: `2.1.0`
+- skill_package_version: `2.1.0`
+- task_package_version: `2.1.0`
+- compatible GAS: `2.0.3`
 - target spreadsheet id: `1ZGb__FQT25BPkzovq2UTfO4clvE7G71PiRm3yywSj6Y`
 - target base URL: `https://docs.google.com/spreadsheets/d/1ZGb__FQT25BPkzovq2UTfO4clvE7G71PiRm3yywSj6Y/edit`
 - timezone: `Asia/Tokyo`
 - gid dependency: `NONE`
 
-`gid` はタブ再生成で変わり得るため、どの成果物も契約・参照に使用しない。
-タブ識別は exact tab name のみ。
+`gid` は契約・参照に使用しない。タブ識別はexact tab nameのみ。
 
-## Workflow
+## Workflow / schedule
 
-T01 収集 → T02 ドラフト → T03 独立監査 → T04 掲載判定
-→ Git Action 1 → T05/T06 独立結果確認 → T07 最終監査 → Git Action 2
+T01 収集 → T02 ドラフト → T03 独立監査 → T04 掲載判定 → Git Action 1 → T05/T06 独立結果確認 → T07 最終監査 → Git Action 2
 
-時刻順は保証に使わない。`status` / `gate` だけを工程順の根拠にする。
+- `:00` T01 / T05
+- `:15` T02 / T06
+- `:30` T03 / T07
+- `:45` T04
+- daily `06:45` T08 optional
+
+同一時刻Task同士を含め、開始/終了順は保証に使わない。`status` / `gate` だけを工程順の根拠にする。
+
+## Canonical repository files
+
+- Workbook: `ops/PROJECT_SIXTH_GeminiSpark_Prediction_Ops.xlsx`
+- Skill sources: `gemini-spark/skills/*/SKILL.md`
+- Skill upload ZIPs: `gemini-spark/packages/*.zip`
+- Task register text: `gemini-spark/tasks/*.md`
+- Contract: `gemini-spark/ops_contract.json`
+
+既存の `spark/` と `spreadsheet/` はcompatibility mirror。canonical側と同じ内容を保持し、独立編集しない。
+
+## Safety / concurrency
+
+- fail closed
+- T5/T6は独立確認
+- `09_RESULTS` は `prediction_id|version` を一意キーとしてcreate-or-update
+- 同一slotでのログ追記は unique id → append → verify → collision時1回retry
+- source成長は T1/T2 discover → T3 verify → T4 approve/promote
+- audit/run logはappend-only
+- Git Action 1: `prediction_id|version`
+- Git Action 2: `prediction_id|version|final_result`
 
 ## GAS overwrite
 
-GASは固定target fileを削除しない。target Spreadsheet ID/URLを維持したまま、
-contract v2.0.0 に一致するsource workbookの全タブをコピーする。
+固定target fileは削除しない。sourceはread only、targetは事前backup、timezoneは`Asia/Tokyo`。contract/tab/gid policyをpreflightし、stage/verify後にcommitする。compatible implementationは2.0.3。
 
-- sourceは読み取りだけ。削除・timezone変更をしない。
-- targetは上書き前に必ずDrive backup。
-- target timezoneは `Asia/Tokyo`。
-- sourceのcontract/tab/gid policyをpreflight検証。
-- copied sheetsを検証するまで旧target tabsを削除しない。
-- Google SheetsへのXLSX変換で行数が縮んでも、`05_CONFIG` の min_rows をGASが復元。
-- row 4 のvalidation/formulaを必要行まで延長。
-- 成功後に `11_AUDIT_LOG` へGAS上書きイベントを追記。
+## Versioning rule
 
-## Future change rule
+構造契約を変更する場合は `schema_version` を上げる。Prompt・Task文・validation・QA等の互換修正は `release_version` / package versionを上げ、Spreadsheet / Skills / Tasksを同時更新する。GASのtransport/verification patchはcontract互換ならimplementation versionだけを上げられる。
 
-仕様変更するときは `schema_version` を上げ、
-Spreadsheet / Skill ZIP / TASKS.md / GAS の4点を同時更新する。
-GASは古いschemaのsourceを拒否するため、片方だけ更新した状態を本番へ入れない。
+Static QA release 2.1.0: 89/89 PASS。次の境界はGemini Spark runtime verification。
