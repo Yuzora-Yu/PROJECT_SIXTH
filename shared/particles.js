@@ -9,6 +9,13 @@ export function particleScene(seed, ruleVersion = config.particleRuleVersion) {
     phase: rng() * 6.28,
     speed: 20 + rng() * 12,
   }));
+  if (ruleVersion >= 5) {
+    const heading = rng() * Math.PI * 2;
+    for (const p of particles) {
+      p.heading = heading + ((rng() - 0.5) * Math.PI) / 2;
+      p.speed = 18 + rng() * 20;
+    }
+  }
   const types = Object.entries(config.particle.events).flatMap(([t, n]) =>
     Array(n).fill(t),
   );
@@ -32,7 +39,7 @@ export function particleScene(seed, ruleVersion = config.particleRuleVersion) {
   }));
   // Place hidden-rule particles at the observable region during their event window.
   for (const e of events)
-    if (e.type === "hidden-rule")
+    if (e.type === "hidden-rule" && ruleVersion < 5)
       particles[e.particleId].x =
         420 - (e.startMs / 1000 + 1) * particles[e.particleId].speed;
   return { particles, events };
@@ -64,10 +71,20 @@ export function particlePosition(p, ms, event, out = {}) {
       }
       if (event.type === "hidden-rule") {
         const bx = bounce(x, 940);
-        if (bx > 380 && bx < 660)
+        if (p.heading !== undefined)
+          y +=
+            Math.sin(((e * 1000) / (event.endMs - event.startMs)) * Math.PI) *
+            75;
+        else if (bx > 380 && bx < 660)
           y += Math.sin(((bx - 380) / 280) * Math.PI) * 75;
       }
     }
+  }
+  if (p.heading !== undefined) {
+    const dx = x - p.x,
+      dy = y - p.y;
+    x = p.x + dx * Math.cos(p.heading) - dy * Math.sin(p.heading);
+    y = p.y + dx * Math.sin(p.heading) + dy * Math.cos(p.heading);
   }
   out.x = 10 + bounce(x, 940);
   out.y = 10 + bounce(y, 520);

@@ -7,30 +7,62 @@ import {
   scoreParticles,
 } from "../shared/particles.js";
 test("live hit/miss/duplicate decisions match final scoring on the same recorded frames", () => {
-  for (let seed = 0; seed < 20; seed++) {
-    const scene = particleScene(seed, 4),
-      found = new Set(),
-      taps = [];
-    let misses = 0;
-    for (let ms = 0; ms <= 30000; ms += 500) {
-      const active = scene.events.find((e) => ms >= e.startMs && ms <= e.endMs);
-      const pos = active
-        ? particlePosition(scene.particles[active.particleId], ms, active)
-        : { x: 480, y: 270 };
-      const tap = { ms, x: pos.x, y: pos.y };
-      taps.push(tap);
-      const d = judgeParticleTap(scene, tap, found, 4);
-      if (d.kind === "hit") found.add(d.event.id);
-      else if (d.kind === "miss") misses++;
+  for (const version of [4, 5]) {
+    for (let seed = 0; seed < 20; seed++) {
+      const scene = particleScene(seed, version),
+        found = new Set(),
+        taps = [];
+      let misses = 0;
+      for (let ms = 0; ms <= 30000; ms += 500) {
+        const active = scene.events.find(
+          (e) => ms >= e.startMs && ms <= e.endMs,
+        );
+        const pos = active
+          ? particlePosition(scene.particles[active.particleId], ms, active)
+          : { x: 480, y: 270 };
+        const tap = { ms, x: pos.x, y: pos.y };
+        taps.push(tap);
+        const d = judgeParticleTap(scene, tap, found, version);
+        if (d.kind === "hit") found.add(d.event.id);
+        else if (d.kind === "miss") misses++;
+      }
+      const result = scoreParticles(seed, taps, version);
+      assert.equal(result.found, found.size);
+      assert.equal(result.falsePositives, misses);
+      assert.deepEqual(
+        result.hits.map((h) => h.eventId),
+        [...found],
+      );
     }
-    const result = scoreParticles(seed, taps, 4);
-    assert.equal(result.found, found.size);
-    assert.equal(result.falsePositives, misses);
-    assert.deepEqual(
-      result.hits.map((h) => h.eventId),
-      [...found],
-    );
   }
+});
+
+test("random flows cover every direction, replay deterministically and remain inside the canvas", () => {
+  const sectors = new Set();
+  for (let seed = 0; seed < 100; seed++) {
+    const scene = particleScene(seed, 5);
+    assert.deepEqual(scene, particleScene(seed, 5));
+    const headings = scene.particles.map((p) => p.heading);
+    assert.ok(Math.max(...headings) - Math.min(...headings) > 1);
+    const mean = headings.reduce((a, b) => a + b, 0) / headings.length;
+    sectors.add(
+      Math.floor(((mean + Math.PI * 2) % (Math.PI * 2)) / (Math.PI / 4)),
+    );
+    for (let ms = 0; ms <= 30000; ms += 1000) {
+      for (const p of scene.particles) {
+        const pos = particlePosition(
+          p,
+          ms,
+          scene.events.find((e) => e.particleId === p.id),
+        );
+        assert.ok(pos.x >= 10 && pos.x <= 950 && pos.y >= 10 && pos.y <= 530);
+      }
+    }
+  }
+  assert.equal(sectors.size, 8);
+  assert.ok(
+    particleScene(11, 4).particles.every((p) => p.heading === undefined),
+  );
 });
 test("area boundary, duplicate and normal particles produce explicit decisions", () => {
   const scene = particleScene(22, 4),

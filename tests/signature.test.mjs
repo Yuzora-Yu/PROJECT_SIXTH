@@ -4,6 +4,8 @@ import {
   calculateProfile,
   profileReading,
   mbtiNames,
+  numberVectors,
+  profileRuleVersion,
 } from "../shared/profile-model.js";
 import { combinedProfile } from "../shared/profiles.js";
 import {
@@ -20,6 +22,32 @@ import {
 import { config } from "../shared/config.js";
 import { characters } from "../data/prisma/catalog.js";
 const time = Date.parse("2026-09-04T02:00:00Z");
+test("all number profiles have distinct axes and shared readings include every supplied layer", () => {
+  for (const life of Object.keys(numberVectors).map(Number)) {
+    const vector = numberVectors[life];
+    assert.ok(Math.max(...vector) - Math.min(...vector) >= 40);
+    for (const mbti of ["", ...Object.keys(mbtiNames)]) {
+      const model = calculateProfile({
+        version: profileRuleVersion,
+        life,
+        mbti,
+        signs: [0, 3, 2, 5, 6, 1, 9, 8, 10, 11],
+      });
+      const reading = profileReading(model);
+      assert.match(reading.short, new RegExp("数秘" + life));
+      assert.match(reading.short, /惑星配置/);
+      assert.match(reading.short, /太陽と月/);
+      assert.ok(!reading.short.includes("undefined"));
+      if (mbti) {
+        assert.ok(reading.short.includes(mbti));
+        assert.match(reading.short, /水星/);
+      }
+      assert.deepEqual(reading.short, reading.paragraphs.join("\n\n"));
+      for (const k of config.senses)
+        assert.equal(model.bonus[k], model.stats[k] / 10);
+    }
+  }
+});
 test("numeric base, all 16 corrections, celestial input and differentiated readings", () => {
   const plain = combinedProfile("2000-01-08", "08:30", 9),
     mbti = combinedProfile("2000-01-08", "08:30", 9, "INFJ");

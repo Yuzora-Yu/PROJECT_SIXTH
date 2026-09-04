@@ -145,8 +145,10 @@ function drawScene(ctx, scene, ms, reveal = false) {
     ctx.lineTo(width, y);
     ctx.stroke();
   }
-  ctx.strokeStyle = "#294b4a";
-  ctx.strokeRect(390, 10, 280, 520);
+  if (scene.particles[0].heading === undefined) {
+    ctx.strokeStyle = "#294b4a";
+    ctx.strokeRect(390, 10, 280, 520);
+  }
   for (const p of scene.particles) {
     if (scene.discovered?.has(p.id)) continue;
     const ev = scene.eventMap.get(p.id);

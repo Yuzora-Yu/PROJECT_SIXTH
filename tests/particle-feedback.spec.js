@@ -44,7 +44,7 @@ test("visible hit removes particle, miss and cooldown are explicit, server agree
   page.on("pageerror", (e) => errors.push(e.message));
   await enter(page);
   const started = await start(page);
-  expect(started.testVersion).toBe(4);
+  expect(started.testVersion).toBe(5);
   await page.locator("#particle-canvas").click({ position: { x: 90, y: 60 } });
   await expect(page.locator("#particle-misses")).toHaveText("1");
   await inputLogical(page, 200, 100);
@@ -56,7 +56,7 @@ test("visible hit removes particle, miss and cooldown are explicit, server agree
   const ms = Math.round(
       (30 - Number(await page.locator("#particle-timer").innerText())) * 1000,
     ),
-    scene = particleScene(started.seed, 4),
+    scene = particleScene(started.seed, started.testVersion),
     e = scene.events[0],
     pos = particlePosition(scene.particles[e.particleId], ms, e);
   const box = await page.locator("#particle-canvas").boundingBox();
@@ -81,7 +81,7 @@ test("visible hit removes particle, miss and cooldown are explicit, server agree
   const data = await (await result).json();
   expect(data.result.found).toBe(1);
   expect(data.result.falsePositives).toBe(1);
-  expect(data.result.particleRuleVersion).toBe(4);
+  expect(data.result.particleRuleVersion).toBe(5);
   await expect(page.locator("#dialog-title")).toHaveText("粒子観測の結果");
   expect(errors).toEqual([]);
 });
@@ -98,7 +98,7 @@ test("phone-sized input area and reduced-motion feedback register the same anoma
   const ms = Math.round(
       (30 - Number(await page.locator("#particle-timer").innerText())) * 1000,
     ),
-    scene = particleScene(started.seed, 4),
+    scene = particleScene(started.seed, started.testVersion),
     e = scene.events[0],
     pos = particlePosition(scene.particles[e.particleId], ms, e);
   // Deliberately offset by 45 logical px: within the visible 72px circle.

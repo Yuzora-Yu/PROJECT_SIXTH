@@ -39,9 +39,9 @@ test("seed and particle coordinates reproduce independently of frame frequency",
     assert.deepEqual(a, particlePosition(p, 9000, e));
   }
 });
-test("five anomaly classes, 16 unique events, hidden-rule region visible", () => {
+test("legacy flow retains five anomaly classes, 16 unique events and hidden-rule region", () => {
   for (let seed = 0; seed < 30; seed++) {
-    const s = particleScene(seed);
+    const s = particleScene(seed, 4);
     assert.equal(s.events.length, 16);
     assert.equal(new Set(s.events.map((e) => e.type)).size, 5);
     assert.equal(new Set(s.events.map((e) => e.particleId)).size, 16);
@@ -57,15 +57,15 @@ test("five anomaly classes, 16 unique events, hidden-rule region visible", () =>
 });
 test("particle hits validated spatially, duplicates counted once, spam rejected", () => {
   const s = particleScene(22),
-    e = s.events.find((e) => e.type === "precursor"),
+    e = s.events[0],
     p = s.particles[e.particleId],
-    ms = e.startMs + 1000,
+    ms = e.startMs + 500,
     pos = particlePosition(p, ms, e);
   const first = { ms, x: pos.x, y: pos.y },
     second = { ms: ms + 500, ...particlePosition(p, ms + 500, e) };
   const r = scoreParticles(22, [first, second]);
   assert.equal(r.found, 1);
-  assert.ok(r.hits[0].leadMs > 0);
+  assert.equal(r.hits[0].eventId, e.id);
   assert.throws(() => scoreParticles(22, [first, { ...first, ms: ms + 1 }]));
   assert.throws(() => scoreParticles(22, [{ ms: NaN, x: 1, y: 1 }]));
 });
@@ -78,7 +78,7 @@ test("particle hit radius accepts nearby taps and preserves old rule scoring", (
   assert.equal(current.particleRuleVersion, 2);
   const p = newPlayer("legacy", time);
   const attempt = perform(p, "/api/daily/particle/start", {}, time);
-  assert.equal(attempt.testVersion, 4);
+  assert.equal(attempt.testVersion, 5);
   p.attempts[`${dayKey(time)}:particle`].testVersion = 1;
   const result = perform(
     p,

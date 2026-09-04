@@ -62,7 +62,17 @@ test("starter, profile layers, baseline, name and three consolidated share cards
       .nth(1)
       .getAttribute("aria-label"),
   ).not.toBe(initial);
-  await expect(page.locator(".reading-item")).toHaveCount(6);
+  await expect(page.locator(".reading-letter p")).toHaveCount(3);
+  await expect(page.locator("#panel-comprehensive")).toBeVisible();
+  await page.locator("#tab-numeric").click();
+  await expect(page.locator("#panel-numeric")).toBeVisible();
+  await expect(page.locator("#panel-comprehensive")).toBeHidden();
+  await page.keyboard.press("ArrowRight");
+  await expect(page.locator("#tab-comprehensive")).toBeFocused();
+  await expect(page.locator("#panel-comprehensive")).toBeVisible();
+  await page
+    .locator(".signature-comparison")
+    .screenshot({ path: "test-results/screens/profile-tabs.png" });
   await page.locator('[data-action="profile-apply"]').click();
   await expect(page.locator('[data-action="profile-apply"]')).toBeDisabled();
   await page.reload();
@@ -73,15 +83,20 @@ test("starter, profile layers, baseline, name and three consolidated share cards
   await expect(page.locator("#main")).toContainText("総研究日数");
   await mkdir("test-results/screens", { recursive: true });
   for (const [i, kind] of ["research", "numeric", "comprehensive"].entries()) {
+    if (i > 0)
+      await page
+        .locator(i === 1 ? "#tab-numeric" : "#tab-comprehensive")
+        .click();
     await page.locator("#main [data-share-image]").nth(i).click();
     await expect(page.locator(".share-dialog img")).toHaveJSProperty(
       "naturalWidth",
       1080,
     );
-    await expect(page.locator(".share-dialog img")).toHaveJSProperty(
-      "naturalHeight",
-      i === 1 ? 1080 : 1440,
-    );
+    const imageHeight = await page
+      .locator(".share-dialog img")
+      .evaluate((img) => img.naturalHeight);
+    expect(imageHeight).toBeGreaterThanOrEqual(i === 1 ? 1080 : 1440);
+    expect(imageHeight).toBeLessThan(2400);
     const x = new URL(
       await page
         .locator('.share-dialog a[target="_blank"]')

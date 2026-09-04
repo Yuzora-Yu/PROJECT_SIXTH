@@ -20,16 +20,16 @@ export function shareButtons(record) {
   if (records.size > 250) records.delete(records.keys().next().value);
   return `<div class="share-actions" aria-label="${escape(record.title)}を共有"><button type="button" class="secondary" data-share-image="${id}">画像を作成</button><a class="secondary" href="${escape(xIntent(record))}" target="_blank" rel="noopener noreferrer">Xに投稿</a><button type="button" class="text-button" data-share-native="${id}">その他の共有</button></div>`;
 }
-function wrapped(ctx, text, x, y, width, lineHeight) {
+function wrapped(ctx, text, x, y, width, lineHeight, draw = true) {
   let line = "";
   for (const c of text) {
     if (c === "\n" || ctx.measureText(line + c).width > width) {
-      ctx.fillText(line, x, y);
+      if (draw) ctx.fillText(line, x, y);
       line = c === "\n" ? "" : c;
       y += lineHeight;
     } else line += c;
   }
-  if (line) ctx.fillText(line, x, y);
+  if (line && draw) ctx.fillText(line, x, y);
   return y + lineHeight;
 }
 export async function shareCanvas(record) {
@@ -37,7 +37,19 @@ export async function shareCanvas(record) {
   const canvas = document.createElement("canvas"),
     tall = Boolean(record.lines?.length);
   canvas.width = 1080;
-  canvas.height = tall ? 1440 : 1080;
+  const measure = canvas.getContext("2d");
+  measure.font = '25px "Yu Gothic UI",sans-serif';
+  const commentY = tall ? 1155 : 805;
+  const commentEnd = wrapped(
+    measure,
+    record.comment,
+    70,
+    commentY + 43,
+    940,
+    36,
+    false,
+  );
+  canvas.height = Math.max(tall ? 1440 : 1080, commentEnd + 115);
   const ctx = canvas.getContext("2d"),
     h = canvas.height;
   const gradient = ctx.createLinearGradient(0, 0, 1080, h);
@@ -130,7 +142,6 @@ export async function shareCanvas(record) {
       );
     });
   }
-  const commentY = tall ? 1155 : 805;
   ctx.fillStyle = "#91ead0";
   ctx.font = '600 20px "Yu Gothic UI",sans-serif';
   ctx.fillText("研究員の所見", 70, commentY);

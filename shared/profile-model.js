@@ -1,6 +1,6 @@
 import { config } from "./config.js";
 import { clamp } from "./core.js";
-export const profileRuleVersion = 3;
+export const profileRuleVersion = 4;
 export const mbtiNames = {
   INTJ: "建築家",
   INTP: "論理学者",
@@ -21,7 +21,7 @@ export const mbtiNames = {
 };
 export const mbtiLabel = (type) =>
   type ? `${type}（${mbtiNames[type]}）` : "未入力";
-export const numberVectors = {
+const numberSeeds = {
   1: [73, 60, 54, 69, 42],
   2: [51, 58, 55, 70, 82],
   3: [60, 65, 49, 76, 67],
@@ -35,6 +35,18 @@ export const numberVectors = {
   22: [77, 78, 87, 53, 65],
   33: [60, 68, 64, 79, 91],
 };
+// Keep each number's centre while making its distinctive axes more legible.
+export const numberVectors = Object.fromEntries(
+  Object.entries(numberSeeds).map(([number, vector]) => {
+    const mean = vector.reduce((sum, value) => sum + value, 0) / 5;
+    return [
+      number,
+      vector.map((value) =>
+        Math.round(clamp(mean + (value - mean) * 1.6, 20, 100)),
+      ),
+    ];
+  }),
+);
 const letterVectors = {
   I: [0, 1, 2, 3, -1],
   E: [3, -1, 0, 0, 3],
@@ -85,6 +97,10 @@ export function calculateProfile(input) {
   const mbtiDelta = Array(5).fill(0);
   for (const l of f.mbti)
     letterVectors[l].forEach((v, i) => (mbtiDelta[i] += v));
+  const meanDelta = mbtiDelta.reduce((sum, value) => sum + value, 0) / 5;
+  mbtiDelta.forEach((value, i) => {
+    mbtiDelta[i] = Math.round((value - meanDelta) * 1.4);
+  });
   const elements = [0, 0, 0, 0];
   f.signs.forEach((s, i) => {
     if (s !== null) elements[s % 4] += weights[i];
@@ -95,7 +111,7 @@ export function calculateProfile(input) {
       ? Math.round(
           (elements.reduce((sum, w, e) => sum + w * elementVectors[e][i], 0) /
             total) *
-            2,
+            3,
         )
       : 0,
   );
@@ -319,43 +335,41 @@ export function profileReading(model) {
     type = f.mbti;
   const style = type ? (type[1] === "N" ? "N" + type[2] : "S" + type[3]) : null;
   const dominant = model.elements.indexOf(Math.max(...model.elements));
-  const paragraphs = [
-    `数秘${f.life}の読み筋は「${n[0]}」。${n[1]}という見立てだ。まず、君自身の感触と合うところがあるか聞かせてほしい。`,
-  ];
-  if (type)
-    paragraphs.push(
-      `${mbtiLabel(type)}を重ねると、受け取ったものを${styleReading[style][0]}方向が加わる。${crossReading[f.life][["NT", "NF", "SJ", "SP"].indexOf(style)]}`,
-    );
+  const numeric = `数秘${f.life}から読む君は、「${n[0]}人」だ。${n[1]}ところに、私は目を留めた。`;
+  const opening =
+    numeric +
+    (type
+      ? `${mbtiLabel(type)}を重ねると、その感触を${styleReading[style][0]}姿が浮かぶ。${crossReading[f.life][["NT", "NF", "SJ", "SP"].indexOf(style)]}${typeReading[type]}`
+      : "君自身には、どんな場面が思い当たるだろう。最初に目が止まった場所から、話を始めよう。");
   const sun = f.signs[0],
     moon = f.signs[1];
-  if (model.elements.some(Boolean))
-    paragraphs.push(
-      `惑星配置では${elementNames[dominant]}の要素が目立つ。${elementReading[dominant]}見方を、この組合せでは試してみたい。${type ? styleReading[style][1] : "最初に目が止まった場所から、観測を始めよう。"}`,
-    );
-  if (sun !== null && moon !== null)
-    paragraphs.push(`太陽と月を重ねて読むと、${moonPairs[sun % 4][moon % 4]}`);
-  else
-    paragraphs.push(
-      "出生時刻が分かると、太陽と月の読みをもう少し絞れる。今は確かな配置から話を進めよう。",
-    );
+  let sky = model.elements.some(Boolean)
+    ? `この傾向を惑星配置から眺めると、${elementNames[dominant]}の要素が目に入る。${elementReading[dominant]}という読みを、君の「${n[0]}」面と照らし合わせたい。`
+    : "惑星配置は、確かな位置が分かってから重ねて読もう。";
+  sky +=
+    sun !== null && moon !== null
+      ? `太陽と月の関係では、${moonPairs[sun % 4][moon % 4]}`
+      : "太陽と月の関係は、出生時刻が分かればもう少し絞れる。";
+  if (sun !== null)
+    sky += [
+      "始めるときの感触が、この配置を読む手掛かりになる。",
+      "しばらく続けても残る感触が、この配置を読む手掛かりになる。",
+      "途中で見方が変わる瞬間が、この配置を読む手掛かりになる。",
+    ][sun % 3];
+  let closing = "";
   if (type && f.signs[2] !== null) {
     const mercury = f.signs[2] % 4;
-    paragraphs.push(
-      `水星の配置は「${["まず試して理解する", "具体的な違いから考える", "複数の説明を並べる", "感触を言葉へ移す"][mercury]}」読みになる。${type[2] === "T" ? "筋道が合う答えを選ぶ前に、最初の違和感も残しておこう。" : "しっくりくる答えと、観測で確かめた答えを一度並べてみよう。"}`,
-    );
+    closing = `考えをまとめる場面では、水星の「${["まず試して理解する", "具体的な違いから考える", "複数の説明を並べる", "感触を言葉へ移す"][mercury]}」という読みも重なる。${type[2] === "T" ? "筋道が合う答えを選ぶ前に、最初の違和感も残しておこう。" : "しっくりくる答えと、観測で確かめた答えを一度並べてみよう。"}`;
   }
   const highest = config.senses.reduce((a, b) =>
     model.stats[a] >= model.stats[b] ? a : b,
   );
-  paragraphs.push(
-    `見落としやすいのは、${n[2]}場面だ。この図では${config.labels[highest]}が先に出ている。次の観測では、普段選ばない見方を一つ試してほしい。`,
-  );
-  if (type) paragraphs[1] += typeReading[type];
-  if (sun !== null)
-    paragraphs[3] += [
-      "太陽は始動の区分だ。始めるときに何を感じたか、覚えておいてほしい。",
-      "太陽は持続の区分だ。観測を続けたあとにも残る感触を聞きたい。",
-      "太陽は調整の区分だ。途中で見方が変わったら、その瞬間を残そう。",
-    ][sun % 3];
-  return { title: `${n[0]}人`, paragraphs, short: paragraphs[type ? 1 : 0] };
+  closing += `重ね合わせた図では${config.labels[highest]}が先に出ている。ただ、${n[2]}場面には気をつけたい。${type ? styleReading[style][1] : "次は、普段選ばない見方を一つ試してほしい。"}`;
+  const paragraphs = [opening, sky, closing];
+  return {
+    title: `${n[0]}人`,
+    numeric,
+    paragraphs,
+    short: paragraphs.join("\n\n"),
+  };
 }
