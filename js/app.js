@@ -10,7 +10,8 @@ import { planetaryProfile, mbtiNotes } from "../shared/profiles.js";
 
 import { config } from "../shared/config.js";
 import { dateLabel, astrology, dayKey } from "../shared/core.js";
-import { characters, monsters } from "../data/prisma/catalog.js";
+import { monsters } from "../data/prisma/catalog.js";
+import { characters, isAvailableCharacter } from "../shared/roster.js";
 import { api, local, serverNow } from "./api.js";
 import {
   radar,
@@ -61,7 +62,8 @@ const navs = [
 ];
 const char = (id) =>
   characters.find((c) => c.id === Number(id)) || characters[0];
-const ownedCount = () => Object.keys(player?.characters || {}).length;
+const ownedCount = () =>
+  Object.keys(player?.characters || {}).filter(isAvailableCharacter).length;
 function intro(eyebrow, title, desc) {
   return `<div class="screen-heading"><span class="eyebrow">${eyebrow}</span><h1>${title}</h1><p>${desc}</p></div>`;
 }
@@ -166,6 +168,7 @@ function charactersPage() {
   );
 }
 function characterDetail(id) {
+  if (!isAvailableCharacter(id)) return;
   const c = char(id),
     o = player?.characters[id];
   modal(
@@ -175,7 +178,11 @@ function characterDetail(id) {
   );
 }
 function battlePage() {
-  if (player && !player.characters[battleCharacter])
+  if (
+    player &&
+    (!player.characters[battleCharacter] ||
+      !isAvailableCharacter(battleCharacter))
+  )
     battleCharacter = player.profileIconCharacterId;
   const c = char(battleCharacter);
   return (

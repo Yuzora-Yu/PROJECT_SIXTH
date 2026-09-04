@@ -113,3 +113,8 @@
 - `gemini-spark/packages/*.zip`（上記7 SkillのGemini Spark登録用ZIP）
 
 予測ゲーム本体コードとGitHub Actionsはこの段階では未実装。
+
+## v0.3.3の追加ファイル
+
+- `shared/roster.js` — マスタを保持した公開対象の選定。
+- `tests/roster.test.mjs` — 召喚・操作制限・既存進行の保持を検証。

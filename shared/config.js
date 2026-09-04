@@ -1,5 +1,5 @@
 export const config = Object.freeze({
-  gameVersion: "0.3.2",
+  gameVersion: "0.3.3",
   testVersion: 1,
   particleRuleVersion: 5,
   battleCoreVersion: 1,
