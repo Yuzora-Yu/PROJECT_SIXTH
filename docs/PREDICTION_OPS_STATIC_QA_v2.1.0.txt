@@ -1,0 +1,99 @@
+PROJECT SIXTH Prediction Ops - Static QA Report v2.1.0
+
+Checks: 89
+Passed: 89
+Failed: 0
+
+[PASS] Workbook has exactly 15 canonical tabs in order :: ['00_DASHBOARD', '01_SPARK_SPEC', '02_SKILLS', '03_TASKS', '04_SCHEDULES', '05_CONFIG', '06_PREDICTIONS', '07_SOURCE_MASTER', '08_SOURCE_CANDIDATES', '09_RESULTS', '10_EVENT_WATCH', '11_AUDIT_LOG', '12_RUN_LOG', '13_ERROR_POLICY', '14_GITHUB_IO']
+[PASS] Config contract_id :: PROJECT_SIXTH_PREDICTION_OPS
+[PASS] Config schema_version :: 2.0.0
+[PASS] Config release_version :: 2.1.0
+[PASS] Config spark_sheet_url :: https://docs.google.com/spreadsheets/d/1ZGb__FQT25BPkzovq2UTfO4clvE7G71PiRm3yywSj6Y/edit
+[PASS] Config gid_dependency :: NONE
+[PASS] Config skill_package_version :: 2.1.0
+[PASS] Config task_package_version :: 2.1.0
+[PASS] Config same_slot_task_policy :: NO_ORDER_DEPENDENCY
+[PASS] Config log_append_policy :: UNIQUE_ID_APPEND_VERIFY_RETRY_ONCE
+[PASS] Config result_row_key :: prediction_id|version
+[PASS] Config source_growth_policy :: T1_T2_DISCOVER__T3_VERIFY__T4_APPROVE
+[PASS] Config gas_implementation_compatible :: 2.0.3
+[PASS] T01 schedule :: 毎時 :00
+[PASS] T01 fixed URL
+[PASS] T01 explicit Task ID
+[PASS] T01 no gid URL
+[PASS] T02 schedule :: 毎時 :15
+[PASS] T02 fixed URL
+[PASS] T02 explicit Task ID
+[PASS] T02 no gid URL
+[PASS] T03 schedule :: 毎時 :30
+[PASS] T03 fixed URL
+[PASS] T03 explicit Task ID
+[PASS] T03 no gid URL
+[PASS] T04 schedule :: 毎時 :45
+[PASS] T04 fixed URL
+[PASS] T04 explicit Task ID
+[PASS] T04 no gid URL
+[PASS] T05 schedule :: 毎時 :00
+[PASS] T05 fixed URL
+[PASS] T05 explicit Task ID
+[PASS] T05 no gid URL
+[PASS] T06 schedule :: 毎時 :15
+[PASS] T06 fixed URL
+[PASS] T06 explicit Task ID
+[PASS] T06 no gid URL
+[PASS] T07 schedule :: 毎時 :30
+[PASS] T07 fixed URL
+[PASS] T07 explicit Task ID
+[PASS] T07 no gid URL
+[PASS] T08 schedule :: 毎日 06:45
+[PASS] T08 fixed URL
+[PASS] T08 explicit Task ID
+[PASS] T08 no gid URL
+[PASS] T01 md prompt equals Sheet :: T01_予言問題案収集.md
+[PASS] T02 md prompt equals Sheet :: T02_選定・加筆修正・選択肢.md
+[PASS] T03 md prompt equals Sheet :: T03_予言問題チェック.md
+[PASS] T04 md prompt equals Sheet :: T04_予言問題掲載判定.md
+[PASS] T05 md prompt equals Sheet :: T05_結果確認1.md
+[PASS] T06 md prompt equals Sheet :: T06_結果確認2.md
+[PASS] T07 md prompt equals Sheet :: T07_結果監査・掲載判定.md
+[PASS] T08 md prompt equals Sheet :: T08_大型イベント早期収集（任意）.md
+[PASS] T5 status validation present :: ['"PENDING,FINAL,ERROR,NOT_DUE"', '"PENDING,FINAL,ERROR,NOT_DUE"']
+[PASS] T6 status validation present :: ['"PENDING,FINAL,ERROR,NOT_DUE"', '"PENDING,FINAL,ERROR,NOT_DUE"']
+[PASS] Formula refs clean :: []
+[PASS] No gid= dependency text in workbook :: []
+[PASS] approve-prediction-publication.zip root only SKILL.md :: ['SKILL.md']
+[PASS] approve-prediction-publication.zip v2.1.0
+[PASS] approve-prediction-publication.zip fixed base URL
+[PASS] approve-prediction-publication.zip concurrency discipline
+[PASS] audit-prediction-question.zip root only SKILL.md :: ['SKILL.md']
+[PASS] audit-prediction-question.zip v2.1.0
+[PASS] audit-prediction-question.zip fixed base URL
+[PASS] audit-prediction-question.zip concurrency discipline
+[PASS] collect-prediction-candidates.zip root only SKILL.md :: ['SKILL.md']
+[PASS] collect-prediction-candidates.zip v2.1.0
+[PASS] collect-prediction-candidates.zip fixed base URL
+[PASS] collect-prediction-candidates.zip concurrency discipline
+[PASS] draft-prediction-question.zip root only SKILL.md :: ['SKILL.md']
+[PASS] draft-prediction-question.zip v2.1.0
+[PASS] draft-prediction-question.zip fixed base URL
+[PASS] draft-prediction-question.zip concurrency discipline
+[PASS] settle-prediction-result.zip root only SKILL.md :: ['SKILL.md']
+[PASS] settle-prediction-result.zip v2.1.0
+[PASS] settle-prediction-result.zip fixed base URL
+[PASS] settle-prediction-result.zip concurrency discipline
+[PASS] verify-prediction-result-primary.zip root only SKILL.md :: ['SKILL.md']
+[PASS] verify-prediction-result-primary.zip v2.1.0
+[PASS] verify-prediction-result-primary.zip fixed base URL
+[PASS] verify-prediction-result-primary.zip concurrency discipline
+[PASS] verify-prediction-result-secondary.zip root only SKILL.md :: ['SKILL.md']
+[PASS] verify-prediction-result-secondary.zip v2.1.0
+[PASS] verify-prediction-result-secondary.zip fixed base URL
+[PASS] verify-prediction-result-secondary.zip concurrency discipline
+[PASS] T2 source-growth path explicit
+[PASS] T5 result upsert/duplicate guard
+[PASS] T6 result upsert/duplicate guard
+[PASS] T7 explicit MATCH/INSUFFICIENT/result_status
+
+Static QA boundary: COMPLETE.
+Next boundary: Gemini Spark runtime verification (Run now / real scheduled execution).
+Official behavior to remember: scheduled task run times can be approximate and tasks can run concurrently; workflow order therefore relies on status/gate, not clock order.

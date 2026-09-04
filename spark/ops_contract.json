@@ -1,0 +1,41 @@
+{
+  "release_version": "2.1.0",
+  "contract_id": "PROJECT_SIXTH_PREDICTION_OPS",
+  "schema_version": "2.0.0",
+  "skill_package_version": "2.1.0",
+  "task_package_version": "2.1.0",
+  "target_spreadsheet_id": "1ZGb__FQT25BPkzovq2UTfO4clvE7G71PiRm3yywSj6Y",
+  "target_base_url": "https://docs.google.com/spreadsheets/d/1ZGb__FQT25BPkzovq2UTfO4clvE7G71PiRm3yywSj6Y/edit",
+  "timezone": "Asia/Tokyo",
+  "gid_dependency": "NONE",
+  "gas_implementation_compatible": "2.0.3",
+  "hourly_schedule_slots": [
+    "00",
+    "15",
+    "30",
+    "45"
+  ],
+  "task_slot_plan": {
+    "00": [
+      "T01",
+      "T05"
+    ],
+    "15": [
+      "T02",
+      "T06"
+    ],
+    "30": [
+      "T03",
+      "T07"
+    ],
+    "45": [
+      "T04"
+    ],
+    "daily_06_45": [
+      "T08"
+    ]
+  },
+  "same_slot_policy": "NO_ORDER_DEPENDENCY",
+  "result_row_key": "prediction_id|version",
+  "source_growth_policy": "T1_T2_DISCOVER__T3_VERIFY__T4_APPROVE"
+}
