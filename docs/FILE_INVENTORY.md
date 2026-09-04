@@ -95,3 +95,8 @@
 - `js/particle-feedback.js`: 入力座標変換、発見・誤検知・待ち時間のエフェクト
 - `tests/particle-feedback.test.mjs`: 即時判定と最終採点の一致・境界判定
 - `tests/particle-feedback.spec.js`: PCとスマホ幅の入力・表示・保存
+
+## v0.3.3の追加ファイル
+
+- `shared/roster.js` — マスタを保持した公開対象の選定。
+- `tests/roster.test.mjs` — 召喚・操作制限・既存進行の保持を検証。

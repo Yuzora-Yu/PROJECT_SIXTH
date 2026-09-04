@@ -10,7 +10,7 @@ import {
   dailyCondition,
 } from "../shared/core.js";
 import { scoreParticles } from "../shared/particles.js";
-import { characters } from "../data/prisma/catalog.js";
+import { characters, isAvailableCharacter } from "../shared/roster.js";
 import { calculateProfile } from "../shared/profile-model.js";
 export const starterIds = [101, 107, 301, 108, 110, 202];
 import { simulateBattle } from "../js/battle/prisma-adapter.js";
@@ -46,6 +46,9 @@ export function newPlayer(id, ms) {
 export function publicPlayer(p, ms) {
   const day = dayKey(ms),
     status = {};
+  const visibleCharacters = Object.fromEntries(
+    Object.entries(p.characters).filter(([id]) => isAvailableCharacter(id)),
+  );
   for (const test of ["card", "particle"])
     status[test] = p.attempts[`${day}:${test}`]?.completed
       ? "complete"
@@ -60,19 +63,25 @@ export function publicPlayer(p, ms) {
     rc: p.rc,
     senseXp: p.senseXp,
     senseStats: senseStats(p.senseXp, p.profileBonus),
-    characters: p.characters,
-    profileIconCharacterId: p.profileIconCharacterId,
+    characters: visibleCharacters,
+    profileIconCharacterId: isAvailableCharacter(p.profileIconCharacterId)
+      ? p.profileIconCharacterId
+      : Number(Object.keys(visibleCharacters)[0] || 101),
     dailyStatus: status,
     condition: dailyCondition(p, day),
     battleRemaining:
       p.battleDay === day
         ? config.battle.dailyLimit - p.battleCount
         : config.battle.dailyLimit,
-    pendingBattle: p.pendingBattle
-      ? { id: p.pendingBattle.id, result: p.pendingBattle.result }
-      : null,
+    pendingBattle:
+      p.pendingBattle &&
+      isAvailableCharacter(p.pendingBattle.result.characterId)
+        ? { id: p.pendingBattle.id, result: p.pendingBattle.result }
+        : null,
     history: p.history.filter((h) => h.testId !== "pattern"),
-    battleHistory: p.battleHistory.slice(-30),
+    battleHistory: p.battleHistory
+      .filter((b) => isAvailableCharacter(b.result.characterId))
+      .slice(-30),
   };
 }
 function finish(p, a, result, ms) {
@@ -96,6 +105,18 @@ function finish(p, a, result, ms) {
 }
 export function perform(p, path, body, ms) {
   const day = dayKey(ms);
+  // Settle an already-started deferred character's result once, without replaying it.
+  // This stays inside the API's existing transaction and preserves earned progress.
+  if (
+    p.pendingBattle &&
+    !isAvailableCharacter(p.pendingBattle.result.characterId)
+  ) {
+    const battle = p.pendingBattle;
+    p.rc += battle.result.rc;
+    p.characters[battle.result.characterId].exp += battle.result.exp;
+    p.battleHistory.push({ ...battle, finishedAt: iso(ms) });
+    p.pendingBattle = null;
+  }
   if (path === "/api/profile/name") {
     assert(
       typeof body.name === "string" &&
@@ -273,6 +294,7 @@ export function perform(p, path, body, ms) {
   if (path === "/api/character/awaken") {
     assert(
       Number.isInteger(body.characterId) &&
+        isAvailableCharacter(body.characterId) &&
         Object.hasOwn(p.characters, body.characterId),
       "所持キャラクターを選択してください。",
       403,
@@ -297,6 +319,7 @@ export function perform(p, path, body, ms) {
     );
     assert(
       Number.isInteger(body.characterId) &&
+        isAvailableCharacter(body.characterId) &&
         Object.hasOwn(p.characters, body.characterId),
       "所持キャラクターを選択してください。",
     );
