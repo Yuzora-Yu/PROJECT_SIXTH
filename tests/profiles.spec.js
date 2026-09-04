@@ -15,12 +15,8 @@ test("starter, profile layers, baseline, name and three consolidated share cards
   await expect(page.locator(".character-copy")).toContainText("アルス");
   await expect(page.locator(".character-copy")).toContainText("冒険者");
   await page.goto("/project_sixth/#characters");
-  await expect(page.locator(".character-tile")).toHaveCount(26);
-  await expect(page.locator(".character-tile.unowned")).toHaveCount(25);
-  await expect(page.locator("#main")).not.toContainText(
-    /ルーナ|ゼノン|リュシオン/,
-  );
-  await expect(page.locator(".summon-bar")).toContainText("全26名");
+  await expect(page.locator(".character-tile")).toHaveCount(30);
+  await expect(page.locator(".character-tile.unowned")).toHaveCount(29);
   await page.locator('[data-action="character-301"]').click();
   await expect(page.locator("#dialog")).toContainText(/誕生日：\d{2}月\d{2}日/);
   await page.keyboard.press("Escape");

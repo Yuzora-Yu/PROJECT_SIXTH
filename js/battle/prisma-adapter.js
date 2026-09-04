@@ -1,5 +1,4 @@
-import { monsters } from "../../data/prisma/catalog.js";
-import { characters } from "../../shared/roster.js";
+import { characters, monsters } from "../../data/prisma/catalog.js";
 import { config } from "../../shared/config.js";
 import { seededRng, clamp, senseStats } from "../../shared/core.js";
 export function senseBonuses(stats, character, condition = 0) {

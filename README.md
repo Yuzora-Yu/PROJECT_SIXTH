@@ -1,6 +1,6 @@
 # 第六感強化計画-PROJECT SIXTH-
 
-被験者として「察知・予見・洞察・感応・共鳴」を観測し、キャラクター育成へつなぐブラウザゲーム。v0.3.3のMVPです。
+被験者として「察知・予見・洞察・感応・共鳴」を観測し、キャラクター育成へつなぐブラウザゲーム。v0.3.2のMVPです。
 
 公開先: https://yu-zora.com/project_sixth/
 
@@ -23,7 +23,7 @@ npm run dev
 - 30秒・100粒子・5種類の異常観測、発見時のエフェクト・粒子消去・即時カウンター、イベント記録とリプレイ
 - 報酬のない反復訓練、試験ごとに直近30回の記録。終了時に回数・自己ベスト・直近記録を即時更新
 - 第六感レーダー、日次コンディション、成績解析
-- PRISMA由来26キャラクター・3モンスターを使った短時間戦闘、1日5回
+- PRISMA由来30キャラクター・3モンスターを使った短時間戦闘、1日5回
 - 無料RCの1回/10連召喚、重複欠片による育成、所持キャラのプロフィール設定
 - 数秘2と11・22・33の区別、太陽・月を含む10天体の配置と主な角度関係
 - 任意の出生時刻・UTC差・日本語名付きMBTI。数秘×タイプ×惑星配置の総合レーダーと、組合せを読み分ける所見
@@ -74,5 +74,9 @@ X用ハッシュタグは `#第六感強化計画 #PROJECTSIXTH`。PNGは端末�
 - [素材の対応・ハッシュ](docs/SOURCE_MAP.md)
 - [流用元の無変更検証](docs/PRISMA_INTEGRITY.json)
 - [実装範囲・残課題](docs/IMPLEMENTATION_NOTES.md)
+- [Gemini Spark 現実予測運用仕様](docs/GEMINI_SPARK_OPERATIONS.md)
+- [現実予測 情報源ポリシー](docs/PREDICTION_SOURCE_POLICY.md)
+- [Gemini Spark Skills / Tasks](gemini-spark/README.md)
+- [現実予測 運用スプレッドシート](ops/PROJECT_SIXTH_GeminiSpark_Prediction_Ops.xlsx)
 
 PRISMA ABYSSはRead Only。アセット・マスタはPROJECT_SIXTH内へコピーしたものだけを利用します。元プロジェクトのセーブキー・API・グローバル変数には依存しません。

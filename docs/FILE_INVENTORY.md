@@ -96,7 +96,20 @@
 - `tests/particle-feedback.test.mjs`: 即時判定と最終採点の一致・境界判定
 - `tests/particle-feedback.spec.js`: PCとスマホ幅の入力・表示・保存
 
-## v0.3.3の追加ファイル
+## 2026-09-04 現実予測運用設計で追加
 
-- `shared/roster.js` — マスタを保持した公開対象の選定。
-- `tests/roster.test.mjs` — 召喚・操作制限・既存進行の保持を検証。
+- `docs/GEMINI_SPARK_OPERATIONS.md`
+- `docs/PREDICTION_SOURCE_POLICY.md`
+- `ops/PROJECT_SIXTH_GeminiSpark_Prediction_Ops.xlsx`
+- `gemini-spark/README.md`
+- `gemini-spark/tasks/TASKS.md`
+- `gemini-spark/skills/collect-prediction-candidates/SKILL.md`
+- `gemini-spark/skills/draft-prediction-question/SKILL.md`
+- `gemini-spark/skills/audit-prediction-question/SKILL.md`
+- `gemini-spark/skills/approve-prediction-publication/SKILL.md`
+- `gemini-spark/skills/verify-prediction-result-primary/SKILL.md`
+- `gemini-spark/skills/verify-prediction-result-secondary/SKILL.md`
+- `gemini-spark/skills/settle-prediction-result/SKILL.md`
+- `gemini-spark/packages/*.zip`（上記7 SkillのGemini Spark登録用ZIP）
+
+予測ゲーム本体コードとGitHub Actionsはこの段階では未実装。

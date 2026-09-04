@@ -16,7 +16,7 @@ import {
 } from "../shared/particles.js";
 import { newPlayer, perform, publicPlayer } from "../worker/game.js";
 import { senseBonuses, simulateBattle } from "../js/battle/prisma-adapter.js";
-import { characters } from "../shared/roster.js";
+import { characters } from "../data/prisma/catalog.js";
 const time = Date.parse("2026-09-04T02:00:00Z");
 test("JST 04:00 is the day boundary, including year rollover", () => {
   assert.equal(dayKey(Date.parse("2026-09-03T18:59:59Z")), "2026-09-03");

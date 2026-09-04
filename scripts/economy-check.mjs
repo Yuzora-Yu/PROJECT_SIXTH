@@ -1,5 +1,5 @@
 import { newPlayer } from "../worker/game.js";
-import { characters } from "../shared/roster.js";
+import { characters } from "../data/prisma/catalog.js";
 import { simulateBattle } from "../js/battle/prisma-adapter.js";
 import { config } from "../shared/config.js";
 const rows = characters.map((c) => {
