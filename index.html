@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width,initial-scale=1,viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#0b1118" />
+    <meta
+      name="description"
+      content="第六感強化計画-PROJECT SIXTH-。察知・予見・洞察・感応・共鳴を観測し、育てるブラウザゲーム。"
+    />
+    <title>第六感強化計画-PROJECT SIXTH-</title>
+    <link rel="icon" href="assets/icon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="css/main.css" />
+    <script type="module" src="js/app.js"></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#main">本文へ移動</a>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <a class="brand" href="#home" aria-label="PROJECT SIXTH ホーム"
+          ><span class="brand-mark">Ⅵ</span
+          ><span
+            >PROJECT<br /><b>SIXTH<span class="mint">.</span></b></span
+          ></a
+        >
+        <div class="sidebar-caption">第六感強化計画</div>
+        <nav id="navigation" aria-label="メインメニュー"></nav>
+        <div class="sidebar-bottom">
+          <span class="live-dot"></span> SUBJECT TERMINAL<br /><small
+            >OBSERVATION SYSTEM / v0.1</small
+          ><button class="text-button" data-action="settings">
+            設定・この計画について ↗
+          </button>
+        </div>
+      </aside>
+      <div class="workspace">
+        <header class="topbar">
+          <div class="breadcrumb">
+            SUBJECT TERMINAL <span>/</span> <b id="breadcrumb">HOME</b>
+          </div>
+          <div class="account" id="account"><span>接続中…</span></div>
+        </header>
+        <main id="main" tabindex="-1">
+          <div class="connecting">
+            <span class="live-dot"></span> 観測端末に接続しています…
+          </div>
+        </main>
+        <footer class="footer">
+          <span>PROJECT SIXTH — ゲーム内研究データ</span>
+          <div class="footer-actions">
+            <button class="text-button" data-action="archive">観測記録</button
+            ><button class="text-button" data-action="settings">設定</button
+            ><span>DAILY RESET 04:00 JST</span>
+          </div>
+        </footer>
+      </div>
+    </div>
+    <dialog id="dialog" aria-labelledby="dialog-title">
+      <div class="dialog-top">
+        <span class="eyebrow" id="dialog-tag">PROJECT SIXTH</span
+        ><button id="dialog-close" class="icon-button" aria-label="閉じる">
+          ×
+        </button>
+      </div>
+      <div id="dialog-content"></div>
+    </dialog>
+    <div id="toast" role="status" aria-live="polite"></div>
+  </body>
+</html>

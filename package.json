@@ -1,0 +1,27 @@
+{
+  "name": "project-sixth",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node scripts/dev-server.mjs",
+    "build": "node scripts/build.mjs",
+    "test": "node --test tests/*.test.mjs",
+    "check": "npm run test && npm run build",
+    "dev:worker": "npm run build && wrangler dev",
+    "db:local": "wrangler d1 migrations apply project-sixth --local",
+    "deploy:check": "npm run build && wrangler deploy --dry-run",
+    "test:browser": "playwright test",
+    "format": "prettier --write index.html css js shared worker scripts tests docs/*.md README.md package.json playwright.config.js wrangler.jsonc .github"
+  },
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20260904.1",
+    "@playwright/test": "^1.62.1",
+    "@types/node": "^26.4.1",
+    "prettier": "^3.9.6",
+    "wrangler": "^4.129.0"
+  }
+}
