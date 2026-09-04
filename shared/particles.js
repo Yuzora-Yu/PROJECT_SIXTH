@@ -73,6 +73,49 @@ export function particlePosition(p, ms, event, out = {}) {
   out.y = 10 + bounce(y, 520);
   return out;
 }
+// One spatial/time decision drives both immediate feedback and server rescoring.
+export function judgeParticleTap(
+  scene,
+  tap,
+  found,
+  ruleVersion = config.particleRuleVersion,
+) {
+  const hitRadius = config.particle.hitRadiusByVersion[ruleVersion];
+  if (!hitRadius) throw Error("未対応の粒子試験バージョンです。");
+  const candidates = scene.particles
+    .map((p) => {
+      const e = scene.events.find((e) => e.particleId === p.id),
+        pos = particlePosition(p, tap.ms, e);
+      return {
+        p,
+        e,
+        pos,
+        dist: pos.visible ? Math.hypot(tap.x - pos.x, tap.y - pos.y) : Infinity,
+      };
+    })
+    .sort((a, b) => a.dist - b.dist);
+  const active = candidates.filter(
+    (c) =>
+      c.dist <= hitRadius &&
+      c.e &&
+      tap.ms >= c.e.startMs &&
+      tap.ms <= c.e.endMs,
+  );
+  const nearest =
+    ruleVersion >= 3
+      ? active.find((c) => !found.has(c.e.id)) || active[0] || candidates[0]
+      : candidates[0];
+  const e = nearest.e;
+  if (nearest.dist > hitRadius || !e || tap.ms < e.startMs || tap.ms > e.endMs)
+    return { kind: "miss" };
+  return {
+    kind: found.has(e.id) ? "duplicate" : "hit",
+    event: e,
+    particleId: nearest.p.id,
+    x: nearest.pos.x,
+    y: nearest.pos.y,
+  };
+}
 export function scoreParticles(
   seed,
   taps,
@@ -104,42 +147,13 @@ export function scoreParticles(
     )
       throw new Error("観測ログの時間または座標が無効です。");
     last = tap.ms;
-    const candidates = scene.particles
-      .map((p) => {
-        const e = scene.events.find((e) => e.particleId === p.id);
-        const pos = particlePosition(p, tap.ms, e);
-        return {
-          p,
-          e,
-          dist: pos.visible
-            ? Math.hypot(tap.x - pos.x, tap.y - pos.y)
-            : Infinity,
-        };
-      })
-      .sort((a, b) => a.dist - b.dist);
-    // A finger indicates an area: an active anomaly inside it wins over normal particles.
-    const active = candidates.filter(
-      (c) =>
-        c.dist <= hitRadius &&
-        c.e &&
-        tap.ms >= c.e.startMs &&
-        tap.ms <= c.e.endMs,
-    );
-    const nearest =
-      ruleVersion >= 3
-        ? active.find((c) => !found.has(c.e.id)) || active[0] || candidates[0]
-        : candidates[0];
-    const e = nearest.e;
-    if (
-      nearest.dist > hitRadius ||
-      !e ||
-      tap.ms < e.startMs ||
-      tap.ms > e.endMs
-    ) {
+    const decision = judgeParticleTap(scene, tap, found, ruleVersion);
+    if (decision.kind === "miss") {
       falsePositives++;
       continue;
     }
-    if (found.has(e.id)) continue;
+    if (decision.kind === "duplicate") continue;
+    const e = decision.event;
     found.add(e.id);
     const lead = e.type === "precursor" ? Math.max(0, e.revealMs - tap.ms) : 0;
     const reaction = Math.max(0, tap.ms - e.startMs);

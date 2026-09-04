@@ -1,19 +1,19 @@
 export const config = Object.freeze({
-  gameVersion: "0.3.0",
+  gameVersion: "0.3.1",
   testVersion: 1,
-  particleRuleVersion: 3,
+  particleRuleVersion: 4,
   battleCoreVersion: 1,
   astrologyRuleVersion: 3,
   timezone: "Asia/Tokyo",
   dailyResetHour: 4,
   particle: {
     durationMs: 30000,
-    durationByVersion: { 1: 60000, 2: 60000, 3: 30000 },
+    durationByVersion: { 1: 60000, 2: 60000, 3: 30000, 4: 30000 },
     count: 100,
     width: 960,
     height: 540,
     cooldownMs: 500,
-    hitRadiusByVersion: { 1: 26, 2: 36, 3: 72 },
+    hitRadiusByVersion: { 1: 26, 2: 36, 3: 72, 4: 72 },
     events: {
       deviation: 4,
       precursor: 4,

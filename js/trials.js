@@ -1,3 +1,4 @@
+import { particlePointer, drawParticleFeedback } from "./particle-feedback.js";
 import { trialComment } from "../shared/profiles.js";
 import { researcherNote } from "./profile-ui.js";
 import { config } from "../shared/config.js";
@@ -6,6 +7,7 @@ import {
   particleScene,
   particlePosition,
   scoreParticles,
+  judgeParticleTap,
 } from "../shared/particles.js";
 import { local, serverNow } from "./api.js";
 import { modal, button, setCleanup, toast, xpHtml } from "./ui.js";
@@ -146,6 +148,7 @@ function drawScene(ctx, scene, ms, reveal = false) {
   ctx.strokeStyle = "#294b4a";
   ctx.strokeRect(390, 10, 280, 520);
   for (const p of scene.particles) {
+    if (scene.discovered?.has(p.id)) continue;
     const ev = scene.eventMap.get(p.id);
     const pos = particlePosition(p, ms, ev, p.renderPosition);
     if (!pos.visible) continue;
@@ -206,10 +209,15 @@ async function particleTest(daily, mutate) {
     lastTap = -500,
     start = 0,
     last = 0,
-    lowTime = 0;
+    lowTime = 0,
+    renderedMs = 0,
+    misses = 0;
+  const found = new Set(),
+    effects = [];
+  const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
   modal(
     "粒子総合観測試験",
-    '<div class="trial-toolbar"><span id="particle-status">3秒間の性能確認中…</span><b class="timer" id="particle-timer">30.0</b></div><canvas id="particle-canvas" class="particle-canvas" width="960" height="540" aria-label="異常を見つけた粒子をタップする観測エリア"></canvas><p class="trial-note">気になった場所を指で示してください。円の範囲で受け付けます。入力間隔は0.5秒です。</p>',
+    '<div class="trial-toolbar"><span id="particle-status">3秒間の性能確認中…</span><b class="timer" id="particle-timer">30.0</b></div><div class="particle-live"><span>発見 <b id="particle-found">0 / 16</b></span><span>誤検知 <b id="particle-misses">0</b></span><span id="particle-feedback" role="status" aria-live="polite">準備しています</span></div><canvas id="particle-canvas" class="particle-canvas" width="960" height="540" aria-label="異常を見つけた粒子をタップする観測エリア"></canvas><p class="trial-note">押した瞬間の円内を判定します。発見すると緑に弾けて消えます。橙色は異常なし、灰色は入力待ちです。</p>',
     daily ? "DAILY / PARTICLE" : "TRAINING / PARTICLE",
   );
   const canvas = document.querySelector("#particle-canvas"),
@@ -261,22 +269,48 @@ async function particleTest(daily, mutate) {
   }
   const version = started?.testVersion || config.particleRuleVersion;
   const duration = config.particle.durationByVersion[version];
+  scene.discovered = new Set();
+  drawScene(ctx, scene, 0);
   active = true;
   start = performance.now();
   last = start;
   document.querySelector("#particle-status").textContent =
     "観測中 · 100 PARTICLES";
+  const feedback = document.querySelector("#particle-feedback");
+  feedback.textContent = "気になった場所をタップしてください";
   canvas.addEventListener("pointerdown", (e) => {
-    if (!active) return;
-    const ms = performance.now() - start;
-    if (ms - lastTap < 500 || ms > duration) return;
-    const r = canvas.getBoundingClientRect();
-    taps.push({
-      ms: Math.round(ms),
-      x: ((e.clientX - r.left) * 960) / r.width,
-      y: ((e.clientY - r.top) * 540) / r.height,
-    });
+    if (!active || (e.pointerType === "mouse" && e.button !== 0)) return;
+    e.preventDefault();
+    const point = particlePointer(canvas, e);
+    if (!point) return;
+    const ms = renderedMs,
+      createdAt = performance.now() - start;
+    if (createdAt > duration) return;
+    const tap = { ms, ...point };
+    if (ms - lastTap < config.particle.cooldownMs) {
+      effects.push({ kind: "cooldown", tap, createdAt });
+      feedback.dataset.kind = "cooldown";
+      feedback.textContent = "入力待ち · 0.5秒間隔で受け付けます";
+      return;
+    }
+    // Judge the exact integer timestamp that produced the visible canvas frame.
+    const decision = judgeParticleTap(scene, tap, found, version);
+    taps.push(tap);
     lastTap = ms;
+    if (decision.kind === "hit") {
+      found.add(decision.event.id);
+      scene.discovered.add(decision.particleId);
+      document.querySelector("#particle-found").textContent =
+        found.size + " / 16";
+      feedback.textContent = "発見！ 異常を記録しました";
+    } else if (decision.kind === "miss") {
+      misses++;
+      document.querySelector("#particle-misses").textContent = String(misses);
+      feedback.textContent = "円内に異常なし · 誤検知 +1";
+    } else feedback.textContent = "この異常は発見済みです";
+    feedback.dataset.kind = decision.kind;
+    canvas.dataset.discovered = String(scene.discovered.size);
+    effects.push({ ...decision, tap, createdAt });
   });
   const save = async () => {
     try {
@@ -314,22 +348,23 @@ async function particleTest(daily, mutate) {
       invalidate("低いフレームレートが続いたため、測定を無効にしました。");
       return;
     }
-    drawScene(ctx, scene, Math.min(elapsed, duration));
-    const tap = taps.at(-1);
-    if (tap && elapsed - tap.ms < 350) {
-      ctx.strokeStyle = "#91ead0";
-      ctx.fillStyle = "#91ead012";
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.arc(
-        tap.x,
-        tap.y,
-        config.particle.hitRadiusByVersion[version],
-        0,
-        Math.PI * 2,
-      );
-      ctx.fill();
-      ctx.stroke();
+    renderedMs = Math.min(duration, Math.max(0, Math.round(elapsed)));
+    drawScene(ctx, scene, renderedMs);
+    while (effects.length && elapsed - effects[0].createdAt > 850)
+      effects.shift();
+    drawParticleFeedback(
+      ctx,
+      effects,
+      elapsed,
+      config.particle.hitRadiusByVersion[version],
+      reducedMotion,
+    );
+    if (
+      feedback.dataset.kind === "cooldown" &&
+      renderedMs - lastTap >= config.particle.cooldownMs
+    ) {
+      feedback.dataset.kind = "ready";
+      feedback.textContent = "次の入力を受け付けます";
     }
     document.querySelector("#particle-timer").textContent = (
       Math.max(0, duration - elapsed) / 1000

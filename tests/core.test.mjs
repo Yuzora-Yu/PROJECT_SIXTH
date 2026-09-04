@@ -78,7 +78,7 @@ test("particle hit radius accepts nearby taps and preserves old rule scoring", (
   assert.equal(current.particleRuleVersion, 2);
   const p = newPlayer("legacy", time);
   const attempt = perform(p, "/api/daily/particle/start", {}, time);
-  assert.equal(attempt.testVersion, 3);
+  assert.equal(attempt.testVersion, 4);
   p.attempts[`${dayKey(time)}:particle`].testVersion = 1;
   const result = perform(
     p,

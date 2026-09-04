@@ -89,3 +89,9 @@
 - `shared/profile-model.js`: 組合せによるプロフィール計算と所見
 - `docs/CHARACTER_BIRTHDAYS.json`: 誕生日決定の内部記録
 - `tests/signature.test.mjs`: 補正・初期選択・領域判定の検証
+
+## v0.3.1の追加
+
+- `js/particle-feedback.js`: 入力座標変換、発見・誤検知・待ち時間のエフェクト
+- `tests/particle-feedback.test.mjs`: 即時判定と最終採点の一致・境界判定
+- `tests/particle-feedback.spec.js`: PCとスマホ幅の入力・表示・保存

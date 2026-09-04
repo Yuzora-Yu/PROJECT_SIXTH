@@ -2,9 +2,9 @@
 
 公開URL: https://yu-zora.com/project_sixth/
 
-- アプリ: v0.3.0
+- アプリ: v0.3.1
 - Worker: `project-sixth`
-- Worker version: `e2417362-313b-4dc4-b622-06180a9f5408`
+- Worker version: `8e1bebfb-2fd6-4fc9-9330-00ee02ed96f4`
 - D1: `project-sixth` / `410a83bb-0907-4ac0-8a1c-110152eba20e`
 - Migration: `0001_initial.sql` 適用済み
 - Routes: `yu-zora.com/project_sixth`、`yu-zora.com/project_sixth/*`
@@ -15,7 +15,7 @@ HTMLに `Cache-Control: public, max-age=0, must-revalidate, no-transform` を付
 
 ## 確認結果
 
-- ユニット・APIテスト: 27件成功
+- ユニット・APIテスト: 29件成功
 - Edgeブラウザ: 4シナリオ成功（30秒粒子試験、離脱時の再試行、Daily、召喚、戦闘、訓練、プロフィール、スマホ幅）
 - 公開URL: HTTP 200、末尾スラッシュなしから308リダイレクト
 - 公開環境でDaily報酬がリロード後も保存されることを確認
@@ -29,6 +29,13 @@ HTMLに `Cache-Control: public, max-age=0, must-revalidate, no-transform` を付
 - 既存PRISMA ABYSS配信URLもHTTP 200
 
 検証用の匿名プレイヤーで本番の保存確認を行いました。ユーザーのローカル試遊データは本番へ移行していません。
+
+## v0.3.1の追加確認
+
+- PCクリック・スマホ幅のタップの2シナリオを実行。緑の発見表示・粒子消去・ライブカウンターを確認
+- 正常範囲の入力は誤検知、0.5秒以内の入力は待ち表示となりカウントされないことを確認
+- 画面に描かれたフレーム時刻と同じ座標判定をサーバーへ渡し、途中のカウンターと終了時の採点を照合
+- 動きの軽減設定と枠線を除いた座標変換を確認
 
 ## 更新手順
 

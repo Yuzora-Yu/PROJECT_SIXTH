@@ -777,3 +777,31 @@
   filter: brightness(0.12);
   opacity: 0.6;
 }
+
+.particle-live {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px 24px;
+  margin: 0 0 12px;
+  font-size: 0.9rem;
+  font-variant-numeric: tabular-nums;
+}
+.particle-live b {
+  font-size: 1.1rem;
+  color: var(--mint);
+}
+#particle-feedback {
+  flex-basis: 100%;
+  min-height: 1.6em;
+  color: var(--muted);
+}
+#particle-feedback[data-kind="hit"] {
+  color: #91ead0;
+}
+#particle-feedback[data-kind="miss"] {
+  color: #ffac91;
+}
+#particle-feedback[data-kind="duplicate"] {
+  color: #f4d58a;
+}
