@@ -96,9 +96,9 @@
   </div>
 
   <div class="warn">
-    v2.0.2では、まずコピー元15タブを別名で全部stage・検証し、
+    v2.0.3では、まずコピー元15タブを別名で全部stage・検証し、
     その後にだけ既存コピー先を退避します。
-    過去の失敗でコピー先に余計なタブが残っていても修復できます。 Google Sheets側の一時的なcopyToエラーは各タブ最大6回まで自動再試行します。
+    過去の失敗でコピー先に余計なタブが残っていても修復できます。 Google Sheets側の一時的なcopyToエラーは各タブ最大6回まで自動再試行します。 数式は文字列完全一致ではなく、数式数・参照先・#REF!/一時tab参照の有無で検証します。
     バックアップは必須です。
   </div>
 
@@ -284,6 +284,13 @@ function runOverwrite() {
 
       if (result.auditWarning) {
         text += '\n警告: ' + result.auditWarning;
+      }
+
+      if (result.formulaWarnings && result.formulaWarnings.length) {
+        text +=
+          '\n数式正規化warning: ' +
+          result.formulaWarnings.length +
+          '件（参照整合性はPASS）';
       }
 
       setStatus(text);

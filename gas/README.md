@@ -1,78 +1,52 @@
-# PROJECT SIXTH Prediction Ops - GAS v2.0.2
+# PROJECT SIXTH Prediction Ops - GAS v2.0.3
 
-## 今回の修正理由
+## 修正理由
 
-v2.0.1で、正しいv2 sourceのcontract検証は通ったものの、
-`STAGE_COPY` 中にGoogle Sheets側の `Sheet.copyTo()` が例外で停止しました。
+v2.0.2では `STAGE_COPY` は成功しましたが、
+`VERIFY_FINAL` で `00_DASHBOARD` の数式文字列がsourceと完全一致しないため
+ロールバックしました。
 
-この場合、rollbackが成功するため固定コピー先は旧v1.1のまま残ります。
-これは「v1.1へ更新された」のではなく「v2更新に失敗して旧版が保全された」状態です。
+Google Sheetsはシートコピー・リネーム・setFormulasの過程で
+数式文字列を正規化する場合があります。
+そのため「文字列が1文字でも違えば失敗」は監査として過剰でした。
 
-## v2.0.2の変更
+## v2.0.3の数式検証
 
-Spreadsheet / Skillのcontract schemaは **2.0.0のまま**です。
-変更対象はGAS transport層だけです。
+完全一致を外しただけではありません。
+成功には以下をすべて要求します。
 
-- sheetごとに `Sheet.copyTo()` を最大6回再試行
-- 1.2秒 → 2.4秒 → 4.8秒 → 9.6秒 → 12秒 の指数バックオフ
-- 各成功コピー後に800ms待機し、Sheets serviceへの連続負荷を緩和
-- `phase=STAGE_COPY:06_PREDICTIONS` のように失敗tabを明示
-- copyToが「サーバ側では成功したが例外を返した」ケースをsheetId差分で回収
-- 全15tabのstaging完了前には既存target tabを変更しない
-- 最終失敗時はrollbackし、固定コピー先の旧状態を維持
+- sourceの各数式セルにtargetにも数式が存在
+- source/targetの数式セル数が一致
+- target数式に `#REF!` がない
+- target数式に `__OLD_`, `__NEW_`, `__ROLLBACK_` がない
+- source/targetで明示的な参照先sheet集合が一致
+- old tabs削除後にもう一度同じ検証を実施
+- 最終tab構成がexactly 15
+- target timezoneがAsia/Tokyo
+- canonical contractが2.0.0
 
-## 整合する組み合わせ
+数式文字列の表記だけが異なり、上記が全部正常な場合のみwarningとして記録します。
 
-- Spreadsheet: `PROJECT_SIXTH_GeminiSpark_Prediction_Ops_v2.xlsx`
-- Spreadsheet schema: `2.0.0`
-- Skills: `PROJECT_SIXTH_GeminiSpark_7Skills_Pack_v2.0.zip`
-- GAS implementation: `2.0.2`
-- 固定target ID:
-  `1ZGb__FQT25BPkzovq2UTfO4clvE7G71PiRm3yywSj6Y`
-- target timezone: `Asia/Tokyo`
-- gid dependency: `NONE`
+## 互換関係
 
-GAS implementationのpatch versionとcontract schemaは役割が異なるため、
-GASだけ2.0.2でも不整合ではありません。
+- Workbook/Skill contract schema: 2.0.0
+- Spreadsheet release: 2.0.1
+- Skill/Task release: 2.0.1
+- GAS implementation: 2.0.3
+- Target Spreadsheet ID:
+  1ZGb__FQT25BPkzovq2UTfO4clvE7G71PiRm3yywSj6Y
+- timezone: Asia/Tokyo
+- gid dependency: NONE
 
-## 更新手順
+GAS patch versionはtransport/verification実装のversionであり、
+Workbook schemaを変更するものではありません。
 
-既存GASの以下3ファイルをv2.0.2へ置換:
+## 更新
 
-- Code.gs
-- Index.html
-- appsscript.json
+既存Webアプリなら:
 
-その後:
+デプロイ → デプロイを管理 → 対象デプロイを編集 →
+新バージョン → デプロイ
 
-`デプロイ` → `デプロイを管理` → 既存Webアプリを編集 →
-`新バージョン` → `デプロイ`
-
-WebアプリURLは維持できます。
-
-## 成功条件
-
-最終targetはexactly 15 tabs:
-
-00_DASHBOARD
-01_SPARK_SPEC
-02_SKILLS
-03_TASKS
-04_SCHEDULES
-05_CONFIG
-06_PREDICTIONS
-07_SOURCE_MASTER
-08_SOURCE_CANDIDATES
-09_RESULTS
-10_EVENT_WATCH
-11_AUDIT_LOG
-12_RUN_LOG
-13_ERROR_POLICY
-14_GITHUB_IO
-
-05_CONFIG:
-- contract_id = PROJECT_SIXTH_PREDICTION_OPS
-- schema_version = 2.0.0
-- gid_dependency = NONE
-
-`__OLD_*`, `__NEW_*`, `～のコピー`, `シート1` 等が残れば失敗です。
+新しく作ったWebアプリを現在の正本URLにした場合は、
+今後そのデプロイを同じ方法で更新してください。

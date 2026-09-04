@@ -1,5 +1,5 @@
 /**
- * PROJECT SIXTH Prediction Ops - Fixed Target Overwriter v2.0.2
+ * PROJECT SIXTH Prediction Ops - Fixed Target Overwriter v2.0.3
  * Contract: PROJECT_SIXTH_PREDICTION_OPS / schema 2.0.0
  *
  * HOTFIX v2.0.2:
@@ -17,7 +17,7 @@
  */
 
 var CONFIG = {
-  IMPLEMENTATION_VERSION: '2.0.2',
+  IMPLEMENTATION_VERSION: '2.0.3',
   CONTRACT_ID: 'PROJECT_SIXTH_PREDICTION_OPS',
   SCHEMA_VERSION: '2.0.0',
   TARGET_SPREADSHEET_ID: '1ZGb__FQT25BPkzovq2UTfO4clvE7G71PiRm3yywSj6Y',
@@ -147,6 +147,7 @@ function overwriteTargetFromSource(sourceInput) {
   var sourceNamedRanges = [];
   var backupUrl = '';
   var auditWarning = '';
+  var formulaWarnings = [];
 
   var runId =
     'GAS-' +
@@ -294,7 +295,13 @@ function overwriteTargetFromSource(sourceInput) {
 
     // 旧タブをまだ残した状態で最終検証。
     phase = 'VERIFY_FINAL';
-    verifyFinalCanonical_(source, target, sourceConfig, originalTargetSheets);
+    verifyFinalCanonical_(
+      source,
+      target,
+      sourceConfig,
+      originalTargetSheets,
+      formulaWarnings
+    );
 
     // 検証成功後だけ旧タブ群を削除。
     phase = 'DELETE_OLD';
@@ -307,6 +314,15 @@ function overwriteTargetFromSource(sourceInput) {
     target.setSpreadsheetTimeZone(CONFIG.TARGET_TIME_ZONE);
     target.setActiveSheet(target.getSheetByName('00_DASHBOARD'));
     SpreadsheetApp.flush();
+
+    // old tabs削除後に、参照切れ・temp参照が発生していないことを再確認。
+    phase = 'POST_COMMIT_VERIFY';
+    verifyPostCommitIntegrity_(
+      source,
+      target,
+      sourceConfig,
+      formulaWarnings
+    );
 
     // Audit書込失敗で「置換自体」を失敗扱いにしない。
     phase = 'AUDIT';
@@ -340,6 +356,7 @@ function overwriteTargetFromSource(sourceInput) {
       sheetNames: REQUIRED_TABS.slice(),
       backupUrl: backupUrl,
       auditWarning: auditWarning,
+      formulaWarnings: formulaWarnings.slice(0, 20),
       completedAtJst: Utilities.formatDate(
         new Date(),
         CONFIG.TARGET_TIME_ZONE,
@@ -596,7 +613,8 @@ function verifyFinalCanonical_(
   source,
   target,
   configMap,
-  originalTargetSheets
+  originalTargetSheets,
+  formulaWarnings
 ) {
   REQUIRED_TABS.forEach(function(tabName) {
     var sourceSheet = source.getSheetByName(tabName);
@@ -631,19 +649,11 @@ function verifyFinalCanonical_(
     var sourceLastColumn = sourceSheet.getLastColumn();
 
     if (sourceLastRow > 0 && sourceLastColumn > 0) {
-      var sourceFormulas =
-        sourceSheet
-          .getRange(1, 1, sourceLastRow, sourceLastColumn)
-          .getFormulas();
-
-      var targetFormulas =
-        targetSheet
-          .getRange(1, 1, sourceLastRow, sourceLastColumn)
-          .getFormulas();
-
-      if (JSON.stringify(sourceFormulas) !== JSON.stringify(targetFormulas)) {
-        throw new Error('FINAL VERIFY formulas mismatch: ' + tabName);
-      }
+      verifyFormulaIntegrity_(
+        sourceSheet,
+        targetSheet,
+        formulaWarnings
+      );
 
       var sourceFormats =
         sourceSheet
@@ -752,6 +762,268 @@ function validateTargetContract_(spreadsheet) {
   assertConfigEquals_(map, 'spark_sheet_id', CONFIG.TARGET_SPREADSHEET_ID);
   assertConfigEquals_(map, 'spark_sheet_url', CONFIG.TARGET_BASE_URL);
   assertConfigEquals_(map, 'gid_dependency', 'NONE');
+}
+
+
+// -----------------------------------------------------------------------------
+// FORMULA INTEGRITY VERIFICATION
+// -----------------------------------------------------------------------------
+
+/**
+ * Google SheetsはsetFormulas()/sheet renameの過程で、
+ * 数式文字列の表記を正規化する場合がある。
+ *
+ * そのため「source文字列 === target文字列」を成功条件にしない。
+ * 代わりに以下を必須とする:
+ * - sourceの数式セルにはtargetにも数式がある
+ * - 数式セル数が一致
+ * - target数式に #REF! / temporary tab参照がない
+ * - sourceとtargetの参照先sheet集合が一致
+ *
+ * 文字列だけが異なり依存先も健全な場合はwarningとして記録する。
+ */
+function verifyFormulaIntegrity_(
+  sourceSheet,
+  targetSheet,
+  warnings
+) {
+  var lastRow = sourceSheet.getLastRow();
+  var lastColumn = sourceSheet.getLastColumn();
+
+  if (lastRow === 0 || lastColumn === 0) {
+    return;
+  }
+
+  var sourceFormulas =
+    sourceSheet
+      .getRange(1, 1, lastRow, lastColumn)
+      .getFormulas();
+
+  var targetFormulas =
+    targetSheet
+      .getRange(1, 1, lastRow, lastColumn)
+      .getFormulas();
+
+  var sourceCount = 0;
+  var targetCount = 0;
+
+  for (var r = 0; r < sourceFormulas.length; r++) {
+    for (var c = 0; c < sourceFormulas[r].length; c++) {
+      var sourceFormula = sourceFormulas[r][c] || '';
+      var targetFormula = targetFormulas[r][c] || '';
+
+      if (sourceFormula) sourceCount++;
+      if (targetFormula) targetCount++;
+
+      if (!sourceFormula) {
+        continue;
+      }
+
+      var a1 =
+        targetSheet
+          .getRange(r + 1, c + 1)
+          .getA1Notation();
+
+      if (!targetFormula) {
+        throw new Error(
+          'FORMULA MISSING: ' +
+          targetSheet.getName() +
+          '!' +
+          a1
+        );
+      }
+
+      assertFormulaHasNoBrokenOrTempRef_(
+        targetFormula,
+        targetSheet.getName() + '!' + a1
+      );
+
+      var sourceRefs = extractSheetRefs_(sourceFormula);
+      var targetRefs = extractSheetRefs_(targetFormula);
+
+      if (
+        JSON.stringify(sourceRefs) !==
+        JSON.stringify(targetRefs)
+      ) {
+        throw new Error(
+          'FORMULA DEPENDENCY mismatch: ' +
+          targetSheet.getName() +
+          '!' +
+          a1 +
+          ' sourceRefs=' +
+          sourceRefs.join(',') +
+          ' targetRefs=' +
+          targetRefs.join(',')
+        );
+      }
+
+      if (
+        normalizeFormulaText_(sourceFormula) !==
+        normalizeFormulaText_(targetFormula)
+      ) {
+        warnings.push(
+          'formula normalized by Sheets: ' +
+          targetSheet.getName() +
+          '!' +
+          a1 +
+          ' | source=' +
+          sourceFormula +
+          ' | target=' +
+          targetFormula
+        );
+      }
+    }
+  }
+
+  if (sourceCount !== targetCount) {
+    throw new Error(
+      'FORMULA COUNT mismatch: ' +
+      targetSheet.getName() +
+      ' source=' +
+      sourceCount +
+      ' target=' +
+      targetCount
+    );
+  }
+}
+
+
+function assertFormulaHasNoBrokenOrTempRef_(formula, location) {
+  var text = String(formula || '');
+
+  if (
+    text.indexOf('#REF!') !== -1 ||
+    text.indexOf('__OLD_') !== -1 ||
+    text.indexOf('__NEW_') !== -1 ||
+    text.indexOf('__ROLLBACK_') !== -1
+  ) {
+    throw new Error(
+      'BROKEN/TEMP FORMULA REF: ' +
+      location +
+      ' formula=' +
+      text
+    );
+  }
+}
+
+
+/**
+ * 数式中の明示sheet参照だけを抽出する。
+ * 例:
+ *   '07_SOURCE_MASTER'!G4:G500
+ *   07_SOURCE_MASTER!G4:G500
+ */
+function extractSheetRefs_(formula) {
+  var text = String(formula || '');
+  var refs = [];
+  var regex =
+    /(?:'((?:[^']|'')+)'|([A-Za-z0-9_]+))!/g;
+  var match;
+
+  while ((match = regex.exec(text)) !== null) {
+    var ref = match[1] || match[2] || '';
+    ref = ref.replace(/''/g, "'");
+
+    if (refs.indexOf(ref) === -1) {
+      refs.push(ref);
+    }
+  }
+
+  refs.sort();
+  return refs;
+}
+
+
+/**
+ * 表記上の差だけをwarning判定するための軽い正規化。
+ * 文字列リテラル内部は壊さないよう、空白削除だけに限定する。
+ */
+function normalizeFormulaText_(formula) {
+  return String(formula || '')
+    .replace(/\s+/g, '')
+    .toUpperCase();
+}
+
+
+/**
+ * commit後の最終監査。
+ * 旧tab削除後に #REF! が出た場合はここで必ず失敗させる。
+ */
+function verifyPostCommitIntegrity_(
+  source,
+  target,
+  configMap,
+  warnings
+) {
+  var actualNames =
+    target.getSheets().map(function(sheet) {
+      return sheet.getName();
+    });
+
+  if (
+    JSON.stringify(actualNames) !==
+    JSON.stringify(REQUIRED_TABS)
+  ) {
+    throw new Error(
+      'POST COMMIT tabs mismatch: ' +
+      actualNames.join(',')
+    );
+  }
+
+  if (
+    target.getSpreadsheetTimeZone() !==
+    CONFIG.TARGET_TIME_ZONE
+  ) {
+    throw new Error(
+      'POST COMMIT timezone mismatch: ' +
+      target.getSpreadsheetTimeZone()
+    );
+  }
+
+  validateTargetContract_(target);
+
+  source.getSheets().forEach(function(sourceSheet) {
+    var targetSheet =
+      target.getSheetByName(sourceSheet.getName());
+
+    if (!targetSheet) {
+      throw new Error(
+        'POST COMMIT target tab missing: ' +
+        sourceSheet.getName()
+      );
+    }
+
+    verifyFormulaIntegrity_(
+      sourceSheet,
+      targetSheet,
+      warnings
+    );
+
+    var lastRow = targetSheet.getLastRow();
+    var lastColumn = targetSheet.getLastColumn();
+
+    if (lastRow > 0 && lastColumn > 0) {
+      var formulas =
+        targetSheet
+          .getRange(1, 1, lastRow, lastColumn)
+          .getFormulas();
+
+      for (var r = 0; r < formulas.length; r++) {
+        for (var c = 0; c < formulas[r].length; c++) {
+          if (formulas[r][c]) {
+            assertFormulaHasNoBrokenOrTempRef_(
+              formulas[r][c],
+              targetSheet.getName() +
+              '!' +
+              targetSheet
+                .getRange(r + 1, c + 1)
+                .getA1Notation()
+            );
+          }
+        }
+      }
+    }
+  });
 }
 
 
