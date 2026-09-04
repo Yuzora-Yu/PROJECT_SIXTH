@@ -82,3 +82,10 @@
 - `shared/profiles.js`
 - `tests/profiles.spec.js`
 - `tests/profiles.test.mjs`
+
+## v0.3.0の追加
+
+- 18枠分の顔・立ち絵: `assets/prisma/face/`、`assets/prisma/characters/` に36ファイル
+- `shared/profile-model.js`: 組合せによるプロフィール計算と所見
+- `docs/CHARACTER_BIRTHDAYS.json`: 誕生日決定の内部記録
+- `tests/signature.test.mjs`: 補正・初期選択・領域判定の検証

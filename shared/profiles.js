@@ -1,6 +1,12 @@
 import { Ecliptic, GeoVector } from "../vendor/astronomy.js";
 import { astrology } from "./core.js";
 import { config } from "./config.js";
+import {
+  calculateProfile,
+  profileReading,
+  profileRuleVersion,
+  numberVectors,
+} from "./profile-model.js";
 export const zodiacNames = [
   "牡羊座",
   "牡牛座",
@@ -77,12 +83,33 @@ export function numerologyProfile(birthDate) {
   const a = astrology(birthDate);
   return {
     ...a,
+    stats: Object.fromEntries(
+      config.senses.map((k, i) => [k, numberVectors[a.life][i]]),
+    ),
     label: [11, 22, 33].includes(a.life)
       ? `${a.life} / マスターナンバー`
       : String(a.life),
     comment: numberNotes[a.life],
     method: "生年月日の数字をすべて足し、11・22・33に達したら残す方式。",
   };
+}
+export function combinedProfile(
+  birthDate,
+  birthTime = "",
+  utcOffset = 9,
+  mbti = "",
+) {
+  const numerology = numerologyProfile(birthDate),
+    sky = planetaryProfile(birthDate, birthTime, utcOffset);
+  const model = calculateProfile({
+    version: profileRuleVersion,
+    life: numerology.life,
+    mbti,
+    signs: sky.planets.map((p) =>
+      p.possibleSigns.length === 1 ? zodiacNames.indexOf(p.sign) : null,
+    ),
+  });
+  return { ...model, numerology, sky, reading: profileReading(model) };
 }
 const longitude = (body, date) => Ecliptic(GeoVector(body, date, true)).elon;
 export function planetaryProfile(birthDate, birthTime = "", utcOffset = 9) {

@@ -4,34 +4,70 @@
 
 画像・元マスタのコピーは無改変。data/prisma/catalog.jsはコピーしたマスタから名前/基本値を抽出し、新作独自適性を付加。source/の元マスタはブラウザ配信しない。
 
-| 元ファイル                                                           | コピー先                          | SHA-256                                                          |
-| -------------------------------------------------------------------- | --------------------------------- | ---------------------------------------------------------------- |
-| characters.js                                                        | data/prisma/source/characters.js  | a8946089d55c26785975400850606d8e725f5c21c9c3434be6c704d7fba09cf8 |
-| monsters.js                                                          | data/prisma/source/monsters.js    | 85c6dedf8e306e00ce5ee4c3958da783e41be37204a798e44d7e3adde1544d25 |
-| assets/characters/face/101.webp                                      | assets/prisma/face/101.webp       | 7dca2e66b3dd7a64d231a3c198584a7a0af559b1bacba0ab27b93e35182a6b42 |
-| assets/characters/fullbody-all-expressions/char_full_101_normal.webp | assets/prisma/characters/101.webp | 0d69bb2d878d6360a53502ac222841e75f8a4cf67d1d75ef07f356664bf0f7c9 |
-| assets/characters/face/102.webp                                      | assets/prisma/face/102.webp       | f7ff4c1aae4430bd79ebd47d80d0466b4d377536ddcf6eaede52fb7765536c6f |
-| assets/characters/fullbody-all-expressions/char_full_102_normal.webp | assets/prisma/characters/102.webp | 725c5e36bcf64a25b0b8b67235448017ddc0fd6c45fb000f0e3f5a8dd280c2c9 |
-| assets/characters/face/103.webp                                      | assets/prisma/face/103.webp       | bb4b877bf63072d8b34ce7e3ccdfcdec69fe513e399e65ec8c61f714d5c4e3a7 |
-| assets/characters/fullbody-all-expressions/char_full_103_normal.webp | assets/prisma/characters/103.webp | 4b47c800784295ba6a474a528e172eee64b7899221d6553f2e94b9193a2fd147 |
-| assets/characters/face/104.webp                                      | assets/prisma/face/104.webp       | 1edf78c06a1f0395a020e3aedd0eb6f819cfe08c37fd8d3709443be06a8cc4f7 |
-| assets/characters/fullbody-all-expressions/char_full_104_normal.webp | assets/prisma/characters/104.webp | 9932038b44c0b2ea89ec430fb15fa0e8798622830291fba7fc8653f9a9610a74 |
-| assets/characters/face/105.webp                                      | assets/prisma/face/105.webp       | 92d33d329b6fc6fb970f0a35f7c708c1de7339ac64d13df846fc89c0eac20d97 |
-| assets/characters/fullbody-all-expressions/char_full_105_normal.webp | assets/prisma/characters/105.webp | c4d1d39f4622318d617b8e2c30aed05bdeac561eb726aa5e847b89d049f73400 |
-| assets/characters/face/106.webp                                      | assets/prisma/face/106.webp       | d4b0247e4feac99ce529d648a223f713444155d9158c986b2b218999ea5be662 |
-| assets/characters/fullbody-all-expressions/char_full_106_normal.webp | assets/prisma/characters/106.webp | 4a61bccc089e3db1000e5f2d28bc5ecf3ced8f97a4b3dcedb43271ca8d07011c |
-| assets/characters/face/107.webp                                      | assets/prisma/face/107.webp       | b8d1bf364abf9c62ee9c3f302c2d8cb2111025c9236b828f0d39364b33a2d479 |
-| assets/characters/fullbody-all-expressions/char_full_107_normal.webp | assets/prisma/characters/107.webp | 2a80e29501ba564a37e959a27ec20b66f0e84ae46767f689632d4600d5f98eb0 |
-| assets/characters/face/108.webp                                      | assets/prisma/face/108.webp       | 0e3421cb4697b3ef2b5b2d03c81fedf3130f678b4fca0d0c31758472fb15e077 |
-| assets/characters/fullbody-all-expressions/char_full_108_normal.webp | assets/prisma/characters/108.webp | e4664bf5b101f700ce1ba01f1d091e31c767f2ebfaab2a91b5a1f7a212dfd2a3 |
-| assets/characters/face/109.webp                                      | assets/prisma/face/109.webp       | 84123a2618b4df93db9e724a42ff7e03ea84e43f9e3344f7556ed50e5a3b1900 |
-| assets/characters/fullbody-all-expressions/char_full_109_normal.webp | assets/prisma/characters/109.webp | cf4ed4d5f1ab921ffb42cec64a61c31fc1002c9e9e776efdaa8080eb98565b57 |
-| assets/characters/face/110.webp                                      | assets/prisma/face/110.webp       | afcf05de841238de1d372b96796571564ede65516826d428fd0781927faafa54 |
-| assets/characters/fullbody-all-expressions/char_full_110_normal.webp | assets/prisma/characters/110.webp | 03893c6b93608e26e3eba62f63c99bbc145779ae2299c4d1e5ecbe4413709346 |
-| assets/characters/face/201.webp                                      | assets/prisma/face/201.webp       | 88eb0f623e3a86c515fe749205a36f863cd8d70aebf5e3aa6b1f6badc4d9fccc |
-| assets/characters/fullbody-all-expressions/char_full_201_normal.webp | assets/prisma/characters/201.webp | 26b72586687a62a3be27d9c77fa89d52ffa0d4bb017bc5402ad480a6ace0b7e5 |
-| assets/characters/face/202.webp                                      | assets/prisma/face/202.webp       | ec7909a4aff3b2f8ece0cbe2d22ec1909d24048877acb2caa5b47e5d942f939f |
-| assets/characters/fullbody-all-expressions/char_full_202_normal.webp | assets/prisma/characters/202.webp | 5cb7978e97e78fa7869f1e9402ec3ae63c68ec11cb2c2dd8ff9a7965a6cdff04 |
-| assets/monsters/monster_000001.webp                                  | assets/prisma/monsters/1.webp     | c07791442363165844a9f8c8c2bc402a8f4d2c1b37875d5d45c741a7899b5a5c |
-| assets/monsters/monster_000002.webp                                  | assets/prisma/monsters/2.webp     | db5da9fd6786a88cfc761c6b4df23bcaba02a89c455c3ae8376eed447b357b99 |
-| assets/monsters/monster_000003.webp                                  | assets/prisma/monsters/3.webp     | 6a95a1967a47a881c5f90e32feac2ff7261e7ef446de004034dcfca781ff5889 |
+|元ファイル|コピー先|SHA-256|
+|---|---|---|
+|characters.js|data/prisma/source/characters.js|a8946089d55c26785975400850606d8e725f5c21c9c3434be6c704d7fba09cf8|
+|monsters.js|data/prisma/source/monsters.js|85c6dedf8e306e00ce5ee4c3958da783e41be37204a798e44d7e3adde1544d25|
+|assets/characters/face/101.webp|assets/prisma/face/101.webp|7dca2e66b3dd7a64d231a3c198584a7a0af559b1bacba0ab27b93e35182a6b42|
+|assets/characters/fullbody-all-expressions/char_full_101_normal.webp|assets/prisma/characters/101.webp|0d69bb2d878d6360a53502ac222841e75f8a4cf67d1d75ef07f356664bf0f7c9|
+|assets/characters/face/102.webp|assets/prisma/face/102.webp|f7ff4c1aae4430bd79ebd47d80d0466b4d377536ddcf6eaede52fb7765536c6f|
+|assets/characters/fullbody-all-expressions/char_full_102_normal.webp|assets/prisma/characters/102.webp|725c5e36bcf64a25b0b8b67235448017ddc0fd6c45fb000f0e3f5a8dd280c2c9|
+|assets/characters/face/103.webp|assets/prisma/face/103.webp|bb4b877bf63072d8b34ce7e3ccdfcdec69fe513e399e65ec8c61f714d5c4e3a7|
+|assets/characters/fullbody-all-expressions/char_full_103_normal.webp|assets/prisma/characters/103.webp|4b47c800784295ba6a474a528e172eee64b7899221d6553f2e94b9193a2fd147|
+|assets/characters/face/104.webp|assets/prisma/face/104.webp|1edf78c06a1f0395a020e3aedd0eb6f819cfe08c37fd8d3709443be06a8cc4f7|
+|assets/characters/fullbody-all-expressions/char_full_104_normal.webp|assets/prisma/characters/104.webp|9932038b44c0b2ea89ec430fb15fa0e8798622830291fba7fc8653f9a9610a74|
+|assets/characters/face/105.webp|assets/prisma/face/105.webp|92d33d329b6fc6fb970f0a35f7c708c1de7339ac64d13df846fc89c0eac20d97|
+|assets/characters/fullbody-all-expressions/char_full_105_normal.webp|assets/prisma/characters/105.webp|c4d1d39f4622318d617b8e2c30aed05bdeac561eb726aa5e847b89d049f73400|
+|assets/characters/face/106.webp|assets/prisma/face/106.webp|d4b0247e4feac99ce529d648a223f713444155d9158c986b2b218999ea5be662|
+|assets/characters/fullbody-all-expressions/char_full_106_normal.webp|assets/prisma/characters/106.webp|4a61bccc089e3db1000e5f2d28bc5ecf3ced8f97a4b3dcedb43271ca8d07011c|
+|assets/characters/face/107.webp|assets/prisma/face/107.webp|b8d1bf364abf9c62ee9c3f302c2d8cb2111025c9236b828f0d39364b33a2d479|
+|assets/characters/fullbody-all-expressions/char_full_107_normal.webp|assets/prisma/characters/107.webp|2a80e29501ba564a37e959a27ec20b66f0e84ae46767f689632d4600d5f98eb0|
+|assets/characters/face/108.webp|assets/prisma/face/108.webp|0e3421cb4697b3ef2b5b2d03c81fedf3130f678b4fca0d0c31758472fb15e077|
+|assets/characters/fullbody-all-expressions/char_full_108_normal.webp|assets/prisma/characters/108.webp|e4664bf5b101f700ce1ba01f1d091e31c767f2ebfaab2a91b5a1f7a212dfd2a3|
+|assets/characters/face/109.webp|assets/prisma/face/109.webp|84123a2618b4df93db9e724a42ff7e03ea84e43f9e3344f7556ed50e5a3b1900|
+|assets/characters/fullbody-all-expressions/char_full_109_normal.webp|assets/prisma/characters/109.webp|cf4ed4d5f1ab921ffb42cec64a61c31fc1002c9e9e776efdaa8080eb98565b57|
+|assets/characters/face/110.webp|assets/prisma/face/110.webp|afcf05de841238de1d372b96796571564ede65516826d428fd0781927faafa54|
+|assets/characters/fullbody-all-expressions/char_full_110_normal.webp|assets/prisma/characters/110.webp|03893c6b93608e26e3eba62f63c99bbc145779ae2299c4d1e5ecbe4413709346|
+|assets/characters/face/201.webp|assets/prisma/face/201.webp|88eb0f623e3a86c515fe749205a36f863cd8d70aebf5e3aa6b1f6badc4d9fccc|
+|assets/characters/fullbody-all-expressions/char_full_201_normal.webp|assets/prisma/characters/201.webp|26b72586687a62a3be27d9c77fa89d52ffa0d4bb017bc5402ad480a6ace0b7e5|
+|assets/characters/face/202.webp|assets/prisma/face/202.webp|ec7909a4aff3b2f8ece0cbe2d22ec1909d24048877acb2caa5b47e5d942f939f|
+|assets/characters/fullbody-all-expressions/char_full_202_normal.webp|assets/prisma/characters/202.webp|5cb7978e97e78fa7869f1e9402ec3ae63c68ec11cb2c2dd8ff9a7965a6cdff04|
+|assets/characters/face/203.webp|assets/prisma/face/203.webp|91aaf055ff612d31f06490efbf0b8095fb588123af0c2b93b95533c2af04188d|
+|assets/characters/fullbody-all-expressions/char_full_203_normal.webp|assets/prisma/characters/203.webp|47640d5e8ed47d928cc854293b056adc33745a5cfd670b26cf42a1c76b5d26f6|
+|assets/characters/face/204.webp|assets/prisma/face/204.webp|d37e2be9d05a85319e937bae3b65874ca4716fd77eb81e2b57f20fdc0d2f7fcb|
+|assets/characters/fullbody-all-expressions/char_full_204_normal.webp|assets/prisma/characters/204.webp|50be8178bf67ef0bac7f2c54abbfa95e3ede8aaff2944caaf8c988481acf668a|
+|assets/characters/face/205.webp|assets/prisma/face/205.webp|dc902b62af6ecf26e9b727b6393c6319c29fa0d047b5e3dc6efc35326d18e824|
+|assets/characters/fullbody-all-expressions/char_full_205_normal.webp|assets/prisma/characters/205.webp|c9f884a3ee113da4ff86e554af27ac94363fd57df70ed4d844674b81ae165dbf|
+|assets/characters/face/206.webp|assets/prisma/face/206.webp|2ee5efedf0b94ef577c1ce90b6c5ea038c50f894f8ba1246be14212635135057|
+|assets/characters/fullbody-all-expressions/char_full_206_normal.webp|assets/prisma/characters/206.webp|28a346179181cb1d8775aede118b9095290a78afe4cb6e264070cd03b624a20b|
+|assets/characters/face/207.webp|assets/prisma/face/207.webp|ff458910857cebd7711e8cdcdb23bbfa68327346b220c03ea56c9f6c292af1d5|
+|assets/characters/fullbody-all-expressions/char_full_207_normal.webp|assets/prisma/characters/207.webp|22ef7af1a78dfcab0ec63ebf2bb8762eaa63d92ef86b590d9866e01d8b5b0788|
+|assets/characters/face/208.webp|assets/prisma/face/208.webp|8b249ecb43e78224ef6c376f5c3b1246f2f6c290e635391728888d924b6db8f7|
+|assets/characters/fullbody-all-expressions/char_full_208_normal.webp|assets/prisma/characters/208.webp|22f1e5d4d56dcdba1a533cdbd6185de4c2d2fdf97ed3b746c1d611cb8d5e6a54|
+|assets/characters/face/209.webp|assets/prisma/face/209.webp|281a32f8f48169d9ca633475e07dd9d94fdb63d13b9e445507bf7c2accc5c1d7|
+|assets/characters/fullbody-all-expressions/char_full_209_normal.webp|assets/prisma/characters/209.webp|afe3674932ed57edc3fbe1c2343ac715298028ad291d7d5daca484d2d91ece18|
+|assets/characters/face/210.webp|assets/prisma/face/210.webp|0befd15e64df799d3dffb2040236584e4abb544d026f6b1dc821ce6b6f707f4b|
+|assets/characters/fullbody-all-expressions/char_full_210_normal.webp|assets/prisma/characters/210.webp|d2ace9fc6443f213ac8dbcd3dd2343eae8baf7b38c7e27a8c04e498c05ac977d|
+|assets/characters/face/301.webp|assets/prisma/face/301.webp|12184834e4eda87b656ebe8195378f9f64e02d419eb609dd6535361bd919bbbd|
+|assets/characters/fullbody-all-expressions/char_full_301_normal.webp|assets/prisma/characters/301.webp|bdb77490bb044dfa21233f5b607a527aac8670c0988ef4ea3d3868854fecea75|
+|assets/characters/face/302.webp|assets/prisma/face/302.webp|6065cc45b8562c2c1c0de70dd591e47db6c5d04af6a14cd4914060739a2265b8|
+|assets/characters/fullbody-all-expressions/char_full_302_normal.webp|assets/prisma/characters/302.webp|1e19865e96db4659132af4c78ac36131fbddf32c03a2cf30e9eaada8c7b5cbdc|
+|assets/characters/face/303.webp|assets/prisma/face/303.webp|0555f9bff31e4f3570d4d49ac4f9c41b4ccdff9f968eccb7bd034292c25566c6|
+|assets/characters/fullbody-all-expressions/char_full_303_normal.webp|assets/prisma/characters/303.webp|99a571bfc0cc19de65694277e095e06e06a0df6ad1a0bbd55bf3aee524133319|
+|assets/characters/face/304.webp|assets/prisma/face/304.webp|5eb7c6a4cf2d134d6f4c6b831e7788a745e1993ebd1667c93a4de1a58be9bb16|
+|assets/characters/fullbody-all-expressions/char_full_304_normal.webp|assets/prisma/characters/304.webp|29c46e72a0fcc1e49e716abfa7757595fd8a6a180793b9980c658029a9fd336f|
+|assets/characters/face/305.webp|assets/prisma/face/305.webp|a61af3562b22e2790ab86236e46c426b79e5649a3e49997df5fcb306688c8922|
+|assets/characters/fullbody-all-expressions/char_full_305_normal.webp|assets/prisma/characters/305.webp|89543a3b413b6792099e61d05728521cefdb737a17a12e2a69bef8945db0748f|
+|assets/characters/face/306.webp|assets/prisma/face/306.webp|f5168dbb0598e2ef88c5a755948c4a42a68e458cfbec359bfecdd1126a9a33e7|
+|assets/characters/fullbody-all-expressions/char_full_306_normal.webp|assets/prisma/characters/306.webp|85a5be09c95a888bbfee2e447d83eea49164ef0e08ba82a40e40dbef6f919d09|
+|assets/characters/face/403.webp|assets/prisma/face/403.webp|b9ddbb0b9a211e84fca978a77b5c98654ba84d868ca8158a1e29dc7834de6827|
+|assets/characters/fullbody-all-expressions/char_full_401_past5y_normal.webp|assets/prisma/characters/403.webp|a8e07d2c9f154aa5cefdf4566ea56a33da52608a62c81a5082f338e1e0c7f8ac|
+|assets/characters/face/401.webp|assets/prisma/face/401.webp|462cf4441c007ebaca2419b42f960ecad1d0430ae9625e81fd9242e11eef48af|
+|assets/characters/fullbody-all-expressions/char_full_401_normal.webp|assets/prisma/characters/401.webp|be8b97ad48fdc775659441d8faaabbd5c76cd29b2f546dd105be8a55b1c272e5|
+|assets/characters/face/402.webp|assets/prisma/face/402.webp|925e2e4f4b662c23899a22ef4dbb0b17e21bbe277b644683b1122cf8da9605a3|
+|assets/characters/fullbody-all-expressions/char_full_402_normal.webp|assets/prisma/characters/402.webp|b87f5147d3512d5bc0d6623dbcb0d1ef170c6b6670bf3d7eb61be809478aa882|
+|assets/characters/face/501.webp|assets/prisma/face/501.webp|dfa466da2c54e400c535270d17ff998a1afda036559541fa3edcd52974dff247|
+|assets/characters/fullbody-all-expressions/char_full_501_normal.webp|assets/prisma/characters/501.webp|cf3b7d4622c65079a69430867d2d47f5af8a2a2b46da7d2a8fd2cde1a48e1efa|
+|assets/monsters/monster_000001.webp|assets/prisma/monsters/1.webp|c07791442363165844a9f8c8c2bc402a8f4d2c1b37875d5d45c741a7899b5a5c|
+|assets/monsters/monster_000002.webp|assets/prisma/monsters/2.webp|db5da9fd6786a88cfc761c6b4df23bcaba02a89c455c3ae8376eed447b357b99|
+|assets/monsters/monster_000003.webp|assets/prisma/monsters/3.webp|6a95a1967a47a881c5f90e32feac2ff7261e7ef446de004034dcfca781ff5889|

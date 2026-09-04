@@ -29,12 +29,15 @@ export function simulateBattle(
     enemy = monsters[Math.floor(rng() * monsters.length)];
   const level = 1 + Math.floor(owned.exp / 60),
     b = withSense
-      ? senseBonuses(senseStats(player.senseXp), c, condition)
+      ? senseBonuses(
+          senseStats(player.senseXp, player.profileBonus),
+          c,
+          condition,
+        )
       : Object.fromEntries(
-          Object.keys(senseBonuses(senseStats(player.senseXp), c)).map((k) => [
-            k,
-            0,
-          ]),
+          Object.keys(
+            senseBonuses(senseStats(player.senseXp, player.profileBonus), c),
+          ).map((k) => [k, 0]),
         );
   const maxHp = c.hp * 3 + level * 4,
     enemyMaxHp = enemy.hp * 4;

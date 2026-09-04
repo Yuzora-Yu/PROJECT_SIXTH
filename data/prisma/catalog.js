@@ -19,7 +19,8 @@ export const characters = [
       "resonance": 46
     },
     "face": "assets/prisma/face/101.webp",
-    "image": "assets/prisma/characters/101.webp"
+    "image": "assets/prisma/characters/101.webp",
+    "birthday": "10-31"
   },
   {
     "id": 102,
@@ -40,7 +41,8 @@ export const characters = [
       "resonance": 85
     },
     "face": "assets/prisma/face/102.webp",
-    "image": "assets/prisma/characters/102.webp"
+    "image": "assets/prisma/characters/102.webp",
+    "birthday": "02-21"
   },
   {
     "id": 103,
@@ -61,7 +63,8 @@ export const characters = [
       "resonance": 62
     },
     "face": "assets/prisma/face/103.webp",
-    "image": "assets/prisma/characters/103.webp"
+    "image": "assets/prisma/characters/103.webp",
+    "birthday": "09-25"
   },
   {
     "id": 104,
@@ -82,7 +85,8 @@ export const characters = [
       "resonance": 30
     },
     "face": "assets/prisma/face/104.webp",
-    "image": "assets/prisma/characters/104.webp"
+    "image": "assets/prisma/characters/104.webp",
+    "birthday": "10-24"
   },
   {
     "id": 105,
@@ -103,7 +107,8 @@ export const characters = [
       "resonance": 38
     },
     "face": "assets/prisma/face/105.webp",
-    "image": "assets/prisma/characters/105.webp"
+    "image": "assets/prisma/characters/105.webp",
+    "birthday": "10-31"
   },
   {
     "id": 106,
@@ -124,7 +129,8 @@ export const characters = [
       "resonance": 85
     },
     "face": "assets/prisma/face/106.webp",
-    "image": "assets/prisma/characters/106.webp"
+    "image": "assets/prisma/characters/106.webp",
+    "birthday": "09-12"
   },
   {
     "id": 107,
@@ -145,7 +151,8 @@ export const characters = [
       "resonance": 54
     },
     "face": "assets/prisma/face/107.webp",
-    "image": "assets/prisma/characters/107.webp"
+    "image": "assets/prisma/characters/107.webp",
+    "birthday": "05-22"
   },
   {
     "id": 108,
@@ -166,7 +173,8 @@ export const characters = [
       "resonance": 62
     },
     "face": "assets/prisma/face/108.webp",
-    "image": "assets/prisma/characters/108.webp"
+    "image": "assets/prisma/characters/108.webp",
+    "birthday": "09-29"
   },
   {
     "id": 109,
@@ -187,7 +195,8 @@ export const characters = [
       "resonance": 30
     },
     "face": "assets/prisma/face/109.webp",
-    "image": "assets/prisma/characters/109.webp"
+    "image": "assets/prisma/characters/109.webp",
+    "birthday": "10-28"
   },
   {
     "id": 110,
@@ -208,7 +217,8 @@ export const characters = [
       "resonance": 85
     },
     "face": "assets/prisma/face/110.webp",
-    "image": "assets/prisma/characters/110.webp"
+    "image": "assets/prisma/characters/110.webp",
+    "birthday": "11-24"
   },
   {
     "id": 201,
@@ -229,7 +239,8 @@ export const characters = [
       "resonance": 46
     },
     "face": "assets/prisma/face/201.webp",
-    "image": "assets/prisma/characters/201.webp"
+    "image": "assets/prisma/characters/201.webp",
+    "birthday": "02-22"
   },
   {
     "id": 202,
@@ -250,7 +261,404 @@ export const characters = [
       "resonance": 54
     },
     "face": "assets/prisma/face/202.webp",
-    "image": "assets/prisma/characters/202.webp"
+    "image": "assets/prisma/characters/202.webp",
+    "birthday": "10-03"
+  },
+  {
+    "id": 203,
+    "name": "ハヤテ",
+    "job": "忍者",
+    "hp": 24,
+    "atk": 10,
+    "def": 5,
+    "spd": 12,
+    "mag": 9,
+    "mdef": 8,
+    "primarySense": "insight",
+    "senseAffinity": {
+      "awareness": 46,
+      "foresight": 30,
+      "insight": 85,
+      "intuition": 38,
+      "resonance": 62
+    },
+    "face": "assets/prisma/face/203.webp",
+    "image": "assets/prisma/characters/203.webp",
+    "birthday": "11-24"
+  },
+  {
+    "id": 204,
+    "name": "レイラ",
+    "job": "聖騎士",
+    "hp": 33,
+    "atk": 10,
+    "def": 13,
+    "spd": 4,
+    "mag": 8,
+    "mdef": 10,
+    "primarySense": "intuition",
+    "senseAffinity": {
+      "awareness": 54,
+      "foresight": 38,
+      "insight": 62,
+      "intuition": 85,
+      "resonance": 30
+    },
+    "face": "assets/prisma/face/204.webp",
+    "image": "assets/prisma/characters/204.webp",
+    "birthday": "04-01"
+  },
+  {
+    "id": 205,
+    "name": "バロン",
+    "job": "剣闘士",
+    "hp": 32,
+    "atk": 13,
+    "def": 7,
+    "spd": 7,
+    "mag": 5,
+    "mdef": 7,
+    "primarySense": "resonance",
+    "senseAffinity": {
+      "awareness": 62,
+      "foresight": 46,
+      "insight": 30,
+      "intuition": 54,
+      "resonance": 85
+    },
+    "face": "assets/prisma/face/205.webp",
+    "image": "assets/prisma/characters/205.webp",
+    "birthday": "11-30"
+  },
+  {
+    "id": 206,
+    "name": "ミネルバ",
+    "job": "賢者",
+    "hp": 23,
+    "atk": 4,
+    "def": 6,
+    "spd": 8,
+    "mag": 14,
+    "mdef": 12,
+    "primarySense": "awareness",
+    "senseAffinity": {
+      "awareness": 85,
+      "foresight": 54,
+      "insight": 38,
+      "intuition": 62,
+      "resonance": 46
+    },
+    "face": "assets/prisma/face/206.webp",
+    "image": "assets/prisma/characters/206.webp",
+    "birthday": "10-29"
+  },
+  {
+    "id": 207,
+    "name": "ハイネ",
+    "job": "侍",
+    "hp": 32,
+    "atk": 14,
+    "def": 6,
+    "spd": 9,
+    "mag": 5,
+    "mdef": 6,
+    "primarySense": "foresight",
+    "senseAffinity": {
+      "awareness": 38,
+      "foresight": 85,
+      "insight": 46,
+      "intuition": 30,
+      "resonance": 54
+    },
+    "face": "assets/prisma/face/207.webp",
+    "image": "assets/prisma/characters/207.webp",
+    "birthday": "09-23"
+  },
+  {
+    "id": 208,
+    "name": "リン",
+    "job": "剣闘士",
+    "hp": 30,
+    "atk": 13,
+    "def": 7,
+    "spd": 9,
+    "mag": 6,
+    "mdef": 6,
+    "primarySense": "insight",
+    "senseAffinity": {
+      "awareness": 46,
+      "foresight": 30,
+      "insight": 85,
+      "intuition": 38,
+      "resonance": 62
+    },
+    "face": "assets/prisma/face/208.webp",
+    "image": "assets/prisma/characters/208.webp",
+    "birthday": "11-27"
+  },
+  {
+    "id": 209,
+    "name": "シルビア",
+    "job": "エンターテイナー",
+    "hp": 26,
+    "atk": 8,
+    "def": 7,
+    "spd": 9,
+    "mag": 11,
+    "mdef": 10,
+    "primarySense": "intuition",
+    "senseAffinity": {
+      "awareness": 54,
+      "foresight": 38,
+      "insight": 62,
+      "intuition": 85,
+      "resonance": 30
+    },
+    "face": "assets/prisma/face/209.webp",
+    "image": "assets/prisma/characters/209.webp",
+    "birthday": "03-21"
+  },
+  {
+    "id": 210,
+    "name": "カリン",
+    "job": "侍",
+    "hp": 31,
+    "atk": 15,
+    "def": 6,
+    "spd": 10,
+    "mag": 4,
+    "mdef": 7,
+    "primarySense": "resonance",
+    "senseAffinity": {
+      "awareness": 62,
+      "foresight": 46,
+      "insight": 30,
+      "intuition": 54,
+      "resonance": 85
+    },
+    "face": "assets/prisma/face/210.webp",
+    "image": "assets/prisma/characters/210.webp",
+    "birthday": "11-25"
+  },
+  {
+    "id": 301,
+    "name": "アルス",
+    "job": "冒険者",
+    "hp": 32,
+    "atk": 10,
+    "def": 8,
+    "spd": 8,
+    "mag": 8,
+    "mdef": 8,
+    "primarySense": "awareness",
+    "senseAffinity": {
+      "awareness": 85,
+      "foresight": 54,
+      "insight": 38,
+      "intuition": 62,
+      "resonance": 46
+    },
+    "face": "assets/prisma/face/301.webp",
+    "image": "assets/prisma/characters/301.webp",
+    "birthday": "11-04"
+  },
+  {
+    "id": 302,
+    "name": "フリーダ",
+    "job": "竜騎士",
+    "hp": 39,
+    "atk": 15,
+    "def": 9,
+    "spd": 10,
+    "mag": 10,
+    "mdef": 9,
+    "primarySense": "foresight",
+    "senseAffinity": {
+      "awareness": 38,
+      "foresight": 85,
+      "insight": 46,
+      "intuition": 30,
+      "resonance": 54
+    },
+    "face": "assets/prisma/face/302.webp",
+    "image": "assets/prisma/characters/302.webp",
+    "birthday": "09-24"
+  },
+  {
+    "id": 303,
+    "name": "リーシア",
+    "job": "星詠師",
+    "hp": 32,
+    "atk": 7,
+    "def": 7,
+    "spd": 9,
+    "mag": 18,
+    "mdef": 13,
+    "primarySense": "insight",
+    "senseAffinity": {
+      "awareness": 46,
+      "foresight": 30,
+      "insight": 85,
+      "intuition": 38,
+      "resonance": 62
+    },
+    "face": "assets/prisma/face/303.webp",
+    "image": "assets/prisma/characters/303.webp",
+    "birthday": "03-27"
+  },
+  {
+    "id": 304,
+    "name": "クロード",
+    "job": "聖拳士",
+    "hp": 41,
+    "atk": 18,
+    "def": 9,
+    "spd": 10,
+    "mag": 6,
+    "mdef": 9,
+    "primarySense": "intuition",
+    "senseAffinity": {
+      "awareness": 54,
+      "foresight": 38,
+      "insight": 62,
+      "intuition": 85,
+      "resonance": 30
+    },
+    "face": "assets/prisma/face/304.webp",
+    "image": "assets/prisma/characters/304.webp",
+    "birthday": "03-24"
+  },
+  {
+    "id": 305,
+    "name": "レオン",
+    "job": "聖騎士",
+    "hp": 41,
+    "atk": 13,
+    "def": 13,
+    "spd": 6,
+    "mag": 10,
+    "mdef": 11,
+    "primarySense": "resonance",
+    "senseAffinity": {
+      "awareness": 62,
+      "foresight": 46,
+      "insight": 30,
+      "intuition": 54,
+      "resonance": 85
+    },
+    "face": "assets/prisma/face/305.webp",
+    "image": "assets/prisma/characters/305.webp",
+    "birthday": "11-27"
+  },
+  {
+    "id": 306,
+    "name": "シャニー",
+    "job": "忍者",
+    "hp": 33,
+    "atk": 13,
+    "def": 6,
+    "spd": 15,
+    "mag": 12,
+    "mdef": 12,
+    "primarySense": "awareness",
+    "senseAffinity": {
+      "awareness": 85,
+      "foresight": 54,
+      "insight": 38,
+      "intuition": 62,
+      "resonance": 46
+    },
+    "face": "assets/prisma/face/306.webp",
+    "image": "assets/prisma/characters/306.webp",
+    "birthday": "10-29"
+  },
+  {
+    "id": 403,
+    "name": "ルーナ",
+    "job": "僧侶",
+    "hp": 20,
+    "atk": 4,
+    "def": 5,
+    "spd": 6,
+    "mag": 9,
+    "mdef": 9,
+    "primarySense": "foresight",
+    "senseAffinity": {
+      "awareness": 38,
+      "foresight": 85,
+      "insight": 46,
+      "intuition": 30,
+      "resonance": 54
+    },
+    "face": "assets/prisma/face/403.webp",
+    "image": "assets/prisma/characters/403.webp",
+    "birthday": "10-07"
+  },
+  {
+    "id": 401,
+    "name": "ルーナ",
+    "job": "聖女",
+    "hp": 65,
+    "atk": 16,
+    "def": 15,
+    "spd": 14,
+    "mag": 35,
+    "mdef": 29,
+    "primarySense": "insight",
+    "senseAffinity": {
+      "awareness": 46,
+      "foresight": 30,
+      "insight": 85,
+      "intuition": 38,
+      "resonance": 62
+    },
+    "face": "assets/prisma/face/401.webp",
+    "image": "assets/prisma/characters/401.webp",
+    "birthday": "11-23"
+  },
+  {
+    "id": 402,
+    "name": "ゼノン",
+    "job": "魔王",
+    "hp": 76,
+    "atk": 29,
+    "def": 19,
+    "spd": 16,
+    "mag": 28,
+    "mdef": 25,
+    "primarySense": "intuition",
+    "senseAffinity": {
+      "awareness": 54,
+      "foresight": 38,
+      "insight": 62,
+      "intuition": 85,
+      "resonance": 30
+    },
+    "face": "assets/prisma/face/402.webp",
+    "image": "assets/prisma/characters/402.webp",
+    "birthday": "03-24"
+  },
+  {
+    "id": 501,
+    "name": "リュシオン",
+    "job": "神",
+    "hp": 90,
+    "atk": 35,
+    "def": 28,
+    "spd": 24,
+    "mag": 35,
+    "mdef": 30,
+    "primarySense": "resonance",
+    "senseAffinity": {
+      "awareness": 62,
+      "foresight": 46,
+      "insight": 30,
+      "intuition": 54,
+      "resonance": 85
+    },
+    "face": "assets/prisma/face/501.webp",
+    "image": "assets/prisma/characters/501.webp",
+    "birthday": "03-23"
   }
 ];
 export const monsters = [

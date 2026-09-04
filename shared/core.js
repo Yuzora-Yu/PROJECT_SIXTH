@@ -37,11 +37,17 @@ export function seededRng(seed) {
 }
 export const emptySenses = () =>
   Object.fromEntries(config.senses.map((k) => [k, 0]));
-export const senseStats = (xp) =>
+export const senseStats = (xp, bonus = {}) =>
   Object.fromEntries(
     config.senses.map((k) => [
       k,
-      clamp(15 + Math.floor(Math.sqrt(xp[k] * 3)), 1, 100),
+      Math.round(
+        clamp(
+          15 + (bonus?.[k] || 0) + Math.floor(Math.sqrt(xp[k] * 3)),
+          1,
+          100,
+        ) * 10,
+      ) / 10,
     ]),
   );
 export function addXp(player, xp) {

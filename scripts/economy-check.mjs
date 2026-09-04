@@ -11,7 +11,7 @@ const rows = characters.map((c) => {
 });
 console.table(rows);
 console.log(
-  `Daily tests: ${config.economy.dailyRC * 3} RC/day. Battles: at most ${config.battle.winRC * 5} RC/day. Combined daily ceiling: 80 RC. Single summon: 100 RC; ten summons: 900 RC. No training rewards.`,
+  `Daily tests: ${config.economy.dailyRC * 2} RC/day. Battles: at most ${config.battle.winRC * 5} RC/day. Combined daily ceiling: 70 RC. Single summon: 100 RC; ten summons: 900 RC. No training rewards.`,
 );
 if (rows.some((r) => r.winRate < 0.3))
   throw new Error("A starting character wins fewer than 30% of trials.");

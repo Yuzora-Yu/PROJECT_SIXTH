@@ -101,21 +101,7 @@ test("desktop and phone journeys, daily/training, summon, battle, privacy and re
   await expect(page.locator("#account")).not.toContainText("300 RC");
   expect(errors).toEqual([]);
 });
-test("five sequential pattern questions complete with server reward", async ({
-  page,
-}) => {
-  await enter(page);
-  await page.locator('[data-action="daily-pattern"]').click();
-  for (let i = 0; i < 5; i++) {
-    await expect(page.locator('[data-choice="0"]')).toBeEnabled({
-      timeout: 10000,
-    });
-    await page.locator('[data-choice="0"]').click();
-  }
-  await expect(page.locator("#dialog-title")).toHaveText("潜在法則の観測結果");
-  await expect(page.locator("#account")).toContainText("310");
-});
-test("60-second particle daily completes and replay renders", async ({
+test("30-second particle daily completes and replay renders", async ({
   page,
 }) => {
   await enter(page);
@@ -128,13 +114,13 @@ test("60-second particle daily completes and replay renders", async ({
     .locator("#particle-canvas")
     .click({ position: { x: 200, y: 100 } });
   await expect(page.locator("#dialog-title")).toHaveText("粒子観測の結果", {
-    timeout: 75000,
+    timeout: 45000,
   });
   await expect(page.locator("#account")).toContainText("310");
   await page.locator("#particle-replay").click();
   await expect(page.locator("#dialog-title")).toHaveText("観測の答え合わせ");
-  await page.locator("#replay-time").fill("45000");
-  await expect(page.locator("#replay-value")).toHaveText("45.0秒");
+  await page.locator("#replay-time").fill("25000");
+  await expect(page.locator("#replay-value")).toHaveText("25.0秒");
 });
 test("particle exit returns the daily right without rewards", async ({
   page,

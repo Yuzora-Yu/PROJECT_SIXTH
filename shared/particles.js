@@ -1,6 +1,6 @@
 import { config } from "./config.js";
 import { seededRng, emptySenses, clamp } from "./core.js";
-export function particleScene(seed) {
+export function particleScene(seed, ruleVersion = config.particleRuleVersion) {
   const rng = seededRng(seed);
   const particles = Array.from({ length: config.particle.count }, (_, id) => ({
     id,
@@ -25,9 +25,9 @@ export function particleScene(seed) {
     id: `e${i}`,
     type,
     particleId: ids[i],
-    startMs: 3000 + i * 3000,
-    revealMs: 6000 + i * 3000,
-    endMs: 11000 + i * 3000,
+    startMs: ruleVersion >= 3 ? 1500 + i * 1500 : 3000 + i * 3000,
+    revealMs: ruleVersion >= 3 ? 3000 + i * 1500 : 6000 + i * 3000,
+    endMs: ruleVersion >= 3 ? 5500 + i * 1500 : 11000 + i * 3000,
     maxBaseScore: 10,
   }));
   // Place hidden-rule particles at the observable region during their event window.
@@ -82,7 +82,8 @@ export function scoreParticles(
   if (!hitRadius) throw new Error("未対応の粒子試験バージョンです。");
   if (!Array.isArray(taps) || taps.length > 120)
     throw new Error("無効な観測ログです。");
-  const scene = particleScene(seed),
+  const duration = config.particle.durationByVersion[ruleVersion];
+  const scene = particleScene(seed, ruleVersion),
     found = new Set(),
     xp = emptySenses();
   let last = -500,
@@ -92,7 +93,7 @@ export function scoreParticles(
     if (
       !Number.isFinite(tap.ms) ||
       tap.ms < 0 ||
-      tap.ms > 60000 ||
+      tap.ms > duration ||
       tap.ms - last < config.particle.cooldownMs ||
       !Number.isFinite(tap.x) ||
       !Number.isFinite(tap.y) ||
@@ -103,7 +104,7 @@ export function scoreParticles(
     )
       throw new Error("観測ログの時間または座標が無効です。");
     last = tap.ms;
-    const nearest = scene.particles
+    const candidates = scene.particles
       .map((p) => {
         const e = scene.events.find((e) => e.particleId === p.id);
         const pos = particlePosition(p, tap.ms, e);
@@ -115,7 +116,19 @@ export function scoreParticles(
             : Infinity,
         };
       })
-      .sort((a, b) => a.dist - b.dist)[0];
+      .sort((a, b) => a.dist - b.dist);
+    // A finger indicates an area: an active anomaly inside it wins over normal particles.
+    const active = candidates.filter(
+      (c) =>
+        c.dist <= hitRadius &&
+        c.e &&
+        tap.ms >= c.e.startMs &&
+        tap.ms <= c.e.endMs,
+    );
+    const nearest =
+      ruleVersion >= 3
+        ? active.find((c) => !found.has(c.e.id)) || active[0] || candidates[0]
+        : candidates[0];
     const e = nearest.e;
     if (
       nearest.dist > hitRadius ||

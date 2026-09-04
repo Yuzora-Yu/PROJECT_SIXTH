@@ -52,6 +52,8 @@ vm.runInContext(
   await readFile(path.join(root, "data/prisma/source/monsters.js"), "utf8"),
   context,
 );
+const previousCatalog = await import("../data/prisma/catalog.js");
+const { astrology } = await import("../shared/core.js");
 const axes = ["awareness", "foresight", "insight", "intuition", "resonance"];
 const primary = [
   "awareness",
@@ -67,24 +69,68 @@ const primary = [
   "foresight",
   "insight",
 ];
-const characters = context.window.CHARACTERS_DATA.slice(0, 12).map((c, i) => ({
+const characters = context.window.CHARACTERS_DATA.filter(
+  (c) => c.id < 1000 && c.name,
+).map((c, i) => ({
   ...Object.fromEntries(
     ["id", "name", "job", "hp", "atk", "def", "spd", "mag", "mdef"].map((k) => [
       k,
       c[k],
     ]),
   ),
-  primarySense: primary[i],
+  primarySense: primary[i] || axes[i % 5],
   senseAffinity: Object.fromEntries(
-    axes.map((k, j) => [k, k === primary[i] ? 85 : 30 + ((i + j * 3) % 5) * 8]),
+    axes.map((k, j) => [
+      k,
+      k === (primary[i] || axes[i % 5]) ? 85 : 30 + ((i + j * 3) % 5) * 8,
+    ]),
   ),
   face: `assets/prisma/face/${c.id}.webp`,
   image: `assets/prisma/characters/${c.id}.webp`,
 }));
+const birthdayReport = [];
 for (const c of characters) {
+  const source = context.window.CHARACTERS_DATA.find((x) => x.id === c.id);
+  if (c.id === 301) c.job = "冒険者";
+  const existing = previousCatalog.characters.find((x) => x.id === c.id);
+  if (existing) {
+    c.senseAffinity = existing.senseAffinity;
+    c.primarySense = existing.primarySense;
+  }
+  const age = Number.isInteger(source.age) ? source.age : null;
+  const reference = Date.parse("2026-09-04T00:00:00Z");
+  const start =
+    age === null
+      ? Date.parse("2000-01-01T00:00:00Z")
+      : Date.UTC(2026 - age - 1, 8, 5);
+  const end =
+    age === null
+      ? Date.parse("2000-12-31T00:00:00Z")
+      : Date.UTC(2026 - age, 8, 4);
+  let best;
+  for (let day = start; day <= end; day += 86400000) {
+    const date = new Date(day).toISOString().slice(0, 10),
+      profile = astrology(date);
+    const error = axes.reduce(
+      (sum, k) => sum + (profile.stats[k] - c.senseAffinity[k]) ** 2,
+      0,
+    );
+    if (!best || error < best.error) best = { date, error };
+  }
+  c.birthday = best.date.slice(5);
+  birthdayReport.push({
+    id: c.id,
+    name: c.name,
+    sourceAge: age,
+    referenceDate: "2026-09-04",
+    internalDate: best.date,
+    error: best.error,
+  });
   await copy(`assets/characters/face/${c.id}.webp`, c.face);
   await copy(
-    `assets/characters/fullbody-all-expressions/char_full_${c.id}_normal.webp`,
+    c.id === 403
+      ? `assets/characters/fullbody-all-expressions/char_full_401_past5y_normal.webp`
+      : `assets/characters/fullbody-all-expressions/char_full_${c.id}_normal.webp`,
     c.image,
   );
 }
@@ -107,6 +153,10 @@ for (const m of monsters)
 await writeFile(
   path.join(root, "data/prisma/catalog.js"),
   `// Extracted from copies; affinity values are PROJECT SIXTH originals.\nexport const characters = ${JSON.stringify(characters, null, 2)};\nexport const monsters = ${JSON.stringify(monsters, null, 2)};\n`,
+);
+await writeFile(
+  path.join(root, "docs/CHARACTER_BIRTHDAYS.json"),
+  JSON.stringify(birthdayReport, null, 2) + "\n",
 );
 await writeFile(
   path.join(root, "docs/SOURCE_MAP.md"),

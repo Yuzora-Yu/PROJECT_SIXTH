@@ -4,9 +4,10 @@ import {
   renderMbti,
   observedPanel,
   researcherNote,
+  savedProfile,
 } from "./profile-ui.js";
 import { planetaryProfile, mbtiNotes } from "../shared/profiles.js";
-import { shareButtons } from "./sharing.js";
+
 import { config } from "../shared/config.js";
 import { dateLabel, astrology, dayKey } from "../shared/core.js";
 import { characters, monsters } from "../data/prisma/catalog.js";
@@ -44,18 +45,10 @@ const labs = [
     sub: "PARTICLE OBSERVATION",
     desc: "100個の粒子の中から、いつもと違う動きを見つける。",
     sense: "察知・予見・洞察・共鳴",
-    time: "60秒",
-  },
-  {
-    id: "pattern",
-    icon: "⌘",
-    name: "潜在法則予測試験",
-    sub: "HIDDEN PATTERN",
-    desc: "流れる記号に潜む法則。次に現れるものを予測する。",
-    sense: "予見・洞察",
-    time: "5問",
+    time: "30秒",
   },
 ];
+const starterIds = [101, 107, 301, 108, 110, 202];
 const navs = [
   ["home", "⌂", "ホーム", "HOME"],
   ["daily", "◈", "デイリーテスト", "DAILY TEST"],
@@ -85,7 +78,7 @@ function render() {
   document.querySelector("#breadcrumb").textContent =
     navs.find((n) => n[0] === route)?.[3] || "HOME";
   document.querySelector("#account").innerHTML = player
-    ? `<span class="coin">◉ ${player.rc.toLocaleString()} <small>RC</small></span><button data-action="characters" aria-label="キャラクターを表示"><img src="${char(player.profileIconCharacterId).face}" alt=""><span class="subject-id">SUBJECT ${player.id.slice(0, 4).toUpperCase()}</span></button>`
+    ? `<span class="coin">◉ ${player.rc.toLocaleString()} <small>RC</small></span><button data-action="characters" aria-label="キャラクターを表示"><img src="${char(player.profileIconCharacterId).face}" alt=""><span class="subject-id">${escape(player.displayName || "SUBJECT " + player.id.slice(0, 4).toUpperCase())}</span></button>`
     : "";
   const pages = {
     home,
@@ -117,8 +110,8 @@ function home() {
     c = char(player?.profileIconCharacterId),
     stats = player?.senseStats;
   return `<div class="page-intro"><div><span class="eyebrow">OBSERVATION LOBBY</span><h1>ようこそ、被験者。</h1><p>今日の「なんとなく」を、観測しよう。</p></div><div class="date-chip">${dateLabel(serverNow())}</div></div>
-  <div class="dashboard-grid"><div class="left-column"><section class="panel hero"><div class="signal-orbit" aria-hidden="true"><div class="signal-cross"></div><span>Ⅵ</span></div><span class="eyebrow">DAILY EXPERIMENT / ${String(completed).padStart(2, "0")} OF 03</span><h2>その直感に、<br>まだ知らない可能性。</h2><p>3つの実験で、第六感を記録する。<br>本日の観測を開始します。</p>${button(completed === 3 ? "本日の結果を見る　↗" : "今日のテストへ　→", completed === 3 ? "analyze" : "daily")}</section>
-  <div class="section-heading"><h2>本日の実験</h2><small>${completed} / 3 完了</small></div><div class="test-grid">${labs.map((l, i) => `<button class="test-card" data-action="daily-${l.id}"><span class="number">0${i + 1}</span><span class="test-icon" aria-hidden="true">${l.icon}</span><h3>${["★カード感応", "粒子総合観測", "潜在法則予測"][i]}</h3><p>${l.time} · ${l.id === "particle" ? "4つの第六感" : l.sense}</p><div class="test-bottom"><span class="status ${player?.dailyStatus[l.id] === "complete" ? "done" : ""}">${player?.dailyStatus[l.id] === "complete" ? "本日完了" : "未実施"}</span><span class="card-arrow">↗</span></div></button>`).join("")}</div>
+  ${player && !player.starterChosen ? starterPrompt() : ""}<div class="dashboard-grid"><div class="left-column"><section class="panel hero"><div class="signal-orbit" aria-hidden="true"><div class="signal-cross"></div><span>Ⅵ</span></div><span class="eyebrow">DAILY EXPERIMENT / ${String(completed).padStart(2, "0")} OF 02</span><h2>その直感に、<br>まだ知らない可能性。</h2><p>2つの実験で、第六感を記録する。<br>本日の観測を開始します。</p>${button(completed === 2 ? "本日の結果を見る　↗" : "今日のテストへ　→", completed === 2 ? "analyze" : "daily")}</section>
+  <div class="section-heading"><h2>本日の実験</h2><small>${completed} / 2 完了</small></div><div class="test-grid">${labs.map((l, i) => `<button class="test-card" data-action="daily-${l.id}"><span class="number">0${i + 1}</span><span class="test-icon" aria-hidden="true">${l.icon}</span><h3>${["★カード感応", "粒子総合観測"][i]}</h3><p>${l.time} · ${l.id === "particle" ? "4つの第六感" : l.sense}</p><div class="test-bottom"><span class="status ${player?.dailyStatus[l.id] === "complete" ? "done" : ""}">${player?.dailyStatus[l.id] === "complete" ? "本日完了" : "未実施"}</span><span class="card-arrow">↗</span></div></button>`).join("")}</div>
   <div class="wide-links"><button class="feature-link" data-action="training"><span class="feature-icon">⠿</span><span><h3>トレーニング</h3><p>気が済むまで、観測しよう。</p></span><span class="arrow">↗</span></button><button class="feature-link" data-action="battle"><span class="feature-icon">⚔</span><span><h3>戦闘実験</h3><p>本日 残り ${player?.battleRemaining ?? "—"} / 5 回</p></span><span class="arrow">↗</span></button></div></div>
   <div class="right-column"><section class="panel chart-panel"><div class="chart-heading"><h2>第六感プロファイル</h2><small>SUBJECT DATA</small></div>${stats ? radar(stats) : '<p class="muted">研究値は接続後に表示されます。</p>'}<div class="stat-strip">${config.senses.map((k) => `<span>${config.labels[k]}<b>${stats?.[k] ?? "—"}</b></span>`).join("")}</div><div class="condition"><span><span class="live-dot"></span>本日のコンディション</span><b>+${Math.round(player?.condition || 0)}</b></div>${button("被験結果を解析する　↗", "analyze", "text-button")}</section>
   <section class="panel character-panel"><img src="${c.image}" alt="${c.name}"><div class="character-copy"><span class="eyebrow">YOUR PARTNER</span><h2>${c.name}</h2><p>${c.job} / LV.${1 + Math.floor((player?.characters[c.id]?.exp || 0) / 60)}<br>得意な第六感：${config.labels[c.primarySense]}</p>${button("キャラクターへ　↗", "characters", "secondary")}</div></section></div></div>
@@ -164,7 +157,7 @@ function charactersPage() {
       "共鳴する、仲間たち。",
       `キャラクターごとに異なる第六感の適性。収集 ${ownedCount()} / ${characters.length}`,
     ) +
-    `<section class="panel summon-bar"><div><h2>共鳴召喚</h2><p>全12名・各1/12（約8.33%）。重複は欠片10個に変換。<br>RCはプレイで獲得する無料・換金不能の通貨です。</p></div><div class="actions">${button("1回 · 100 RC", "draw-1")}${button("10連 · 900 RC", "draw-10", "secondary")}</div></section><div class="character-grid">${characters
+    `${player && !player.starterChosen ? starterPrompt() : ""}<section class="panel summon-bar"><div><h2>共鳴召喚</h2><p>全${characters.length}名・各1/${characters.length}（約${(100 / characters.length).toFixed(2)}%）。重複は欠片10個に変換。<br>RCはプレイで獲得する無料・換金不能の通貨です。</p></div><div class="actions">${button("1回 · 100 RC", "draw-1")}${button("10連 · 900 RC", "draw-10", "secondary")}</div></section><div class="character-grid">${characters
       .map((c) => {
         const o = player?.characters[c.id];
         return `<button class="character-tile ${o ? "" : "unowned"}" data-action="character-${c.id}" aria-label="${c.name} ${o ? "所持" : "未取得"}"><span class="owned-badge">${o ? (player.profileIconCharacterId === c.id ? "PROFILE" : "OWNED") : "未取得"}</span><img src="${c.image}" alt="" loading="lazy"><div class="tile-caption"><h3>${c.name}</h3><small>${o ? `LV.${1 + Math.floor(o.exp / 60)} · ` : ""}${c.job}</small></div></button>`;
@@ -177,11 +170,13 @@ function characterDetail(id) {
     o = player?.characters[id];
   modal(
     c.name,
-    `<div class="character-detail"><div><img class="character-art" src="${c.image}" alt="${c.name}"><p class="muted">${c.job} · 得意な第六感：${config.labels[c.primarySense]}</p></div><div><span class="eyebrow">CHARACTER AFFINITY</span>${radar(c.senseAffinity, "キャラクター固有適性")}<p class="small muted">キャラクター固有の適性です。被験者本人の研究値とは別に保持されます。</p>${o ? `<p>LV.${1 + Math.floor(o.exp / 60)}　EXP ${o.exp % 60} / 60<br>育成の欠片 ${o.shards} 個</p><div class="actions">${button("プロフィールに設定", `icon-${id}`)}${button("欠片10個で育成", `awaken-${id}`, "secondary", o.shards < 10 ? "disabled" : "")}</div>` : '<p class="muted">このキャラクターはまだ取得していません。</p>'}</div></div>${o ? shareButtons({ title: `${c.name} / キャラクター適性`, summary: `${c.job}・得意な第六感：${config.labels[c.primarySense]}`, stats: c.senseAffinity, comment: "仲間の適性と、君自身の研究値は別の記録だ。組み合わせを変えて試してみよう。" }) : ""}`,
+    `<div class="character-detail"><div><img class="character-art ${o ? "" : "unowned-art"}" src="${c.image}" alt="${c.name}"><p>${c.job}</p><p>誕生日：${c.birthday.replace("-", "月")}日</p></div><div><span class="eyebrow">CHARACTER AFFINITY</span>${radar(c.senseAffinity, "キャラクター固有適性")}<p class="small muted">得意な第六感：${config.labels[c.primarySense]}</p>${o ? `<p>LV.${1 + Math.floor(o.exp / 60)} · EXP ${o.exp % 60}/60<br>育成の欠片 ${o.shards}個</p><div class="actions">${button("プロフィールに設定", `icon-${id}`)}${button("欠片10個で育成", `awaken-${id}`, "secondary", o.shards < 10 ? "disabled" : "")}</div>` : '<p class="muted">共鳴召喚で仲間になります。</p>'}</div></div>`,
     "SUBJECT FILE",
   );
 }
 function battlePage() {
+  if (player && !player.characters[battleCharacter])
+    battleCharacter = player.profileIconCharacterId;
   const c = char(battleCharacter);
   return (
     intro(
@@ -236,7 +231,7 @@ async function runBattle() {
       if (i >= r.turns.length) {
         clearInterval(interval);
         document.querySelector("#battle-finish").innerHTML =
-          `<div class="result-banner"><h3>${r.win ? "実証成功" : "実験終了"}</h3><p>${r.rc} RC / ${r.exp} EXP</p>${button("結果を保存する", `battle-finish-${b.id}`)}</div>${shareButtons({ title: "能力実証試験", summary: `${c.name} / ${r.win ? "実証成功" : "実験終了"}・${r.rc} RC・${r.exp} EXP`, comment: "今回の戦闘記録を受け取った。研究値の変化があれば、次の実験とも比べてみよう。" })}`;
+          `<div class="result-banner"><h3>${r.win ? "実証成功" : "実験終了"}</h3><p>${r.rc} RC / ${r.exp} EXP</p>${button("結果を保存する", `battle-finish-${b.id}`)}</div>`;
       }
     },
     matchMedia("(prefers-reduced-motion: reduce)").matches ? 100 : 420,
@@ -259,19 +254,19 @@ function xpTrend(history) {
 }
 function analyzePage() {
   const history = player?.history || [],
-    training = local.get("training", []),
+    training = local.get("training", []).filter((r) => r.testId !== "pattern"),
     cards = history.filter((h) => h.testId === "card"),
     hits = cards.filter((h) => h.correct).length,
-    particles = history.filter((h) => h.testId === "particle"),
-    patterns = history.filter((h) => h.testId === "pattern");
+    particles = history.filter((h) => h.testId === "particle");
   return (
     intro(
       "ANALYZE",
       "被験結果解析",
       "研究値、実際の成績、自己申告のプロフィールを、それぞれの記録として読む。",
     ) +
-    `<div class="two-columns"><section class="panel"><span class="eyebrow">OBSERVED PROFILE</span><h2>ゲーム内研究値</h2>${player ? radar(player.senseStats) + observedPanel(player) : "<p>記録は接続後に表示されます。</p>"}</section><section class="panel"><span class="eyebrow">DAILY RECORD</span><h2>Dailyの測定成績</h2><table class="data-table"><thead><tr><th>試験</th><th>試行数</th><th>実測結果</th></tr></thead><tbody><tr><td>★カード</td><td>${cards.length}</td><td>${cards.length ? ((hits / cards.length) * 100).toFixed(1) + "% 的中" : "—"}</td></tr><tr><td>粒子観測</td><td>${particles.length}</td><td>${particles.length ? (particles.reduce((s, h) => s + h.found, 0) / particles.length).toFixed(1) + " / 16 発見" : "—"}</td></tr><tr><td>潜在法則</td><td>${patterns.length}</td><td>${patterns.length ? (patterns.reduce((s, h) => s + h.correct, 0) / patterns.length).toFixed(1) + " / 5 正解" : "—"}</td></tr></tbody></table><p class="small muted">★カードの理論的中率は20%。少ない試行数では大きく変動します。</p>${xpTrend(history)}<h3>訓練の記録</h3><p class="small muted">直近保存 ${training.length} 回。訓練はDaily成績・研究値へ加算しません。</p><div class="actions">${button("過去の記録を見る", "archive", "secondary")}${button("トレーニングへ", "training", "text-button")}</div></section></div>` +
-    profilePanels()
+    `<div class="two-columns"><section class="panel"><span class="eyebrow">OBSERVED PROFILE</span><h2>ゲーム内研究値</h2>${player ? radar(player.senseStats) + observedPanel(player) : "<p>記録は接続後に表示されます。</p>"}</section><section class="panel"><span class="eyebrow">DAILY RECORD</span><h2>Dailyの測定成績</h2><table class="data-table"><thead><tr><th>試験</th><th>試行数</th><th>実測結果</th></tr></thead><tbody><tr><td>★カード</td><td>${cards.length}</td><td>${cards.length ? ((hits / cards.length) * 100).toFixed(1) + "% 的中" : "—"}</td></tr><tr><td>粒子観測</td><td>${particles.length}</td><td>${particles.length ? (particles.reduce((s, h) => s + h.found, 0) / particles.length).toFixed(1) + " / 16 発見" : "—"}</td></tr></tbody></table><p class="small muted">★カードの理論的中率は20%。少ない試行数では大きく変動します。</p>${xpTrend(history)}<h3>訓練の記録</h3><p class="small muted">直近保存 ${training.length} 回。訓練はDaily成績・研究値へ加算しません。</p><div class="actions">${button("過去の記録を見る", "archive", "secondary")}${button("トレーニングへ", "training", "text-button")}</div></section></div>` +
+    namePanel() +
+    profilePanels(player)
   );
 }
 function renderAstrology() {
@@ -286,6 +281,7 @@ function archivePage() {
   const daily = (player?.history || []).map((r) => ({ ...r, mode: "Daily" })),
     training = local.get("training", []).map((r) => ({ ...r, mode: "訓練" }));
   const records = [...daily, ...training]
+    .filter((r) => r.testId !== "pattern")
     .sort((a, b) => Date.parse(b.finishedAt) - Date.parse(a.finishedAt))
     .slice(0, 90);
   return (
@@ -314,7 +310,7 @@ function archivePage() {
               minute: "2-digit",
               second: "2-digit",
             }).format(Date.parse(r.finishedAt));
-            return `<section class="record-row"><div><span class="history-mode">${r.mode}</span><small> · ${date} JST · v${r.testVersion}</small><br><b>${name}</b><p class="small muted">${summary}</p></div><div>${r.mode === "Daily" ? `<small>${Object.values(r.xp || {}).reduce((a, b) => a + b, 0)} XP / +${r.rc} RC</small>` : '<small class="muted">恒久XP・RCへの反映なし</small>'}${r.testId === "particle" && r.seed !== undefined ? button("再生", `replay-record-${r.attemptId || r.id}`, "text-button") : ""}</div>${shareButtons({ title: r.mode + " / " + name, summary, comment: "今回の記録を受け取った。次の観測と、あとで並べて見てみよう。" })}</section>`;
+            return `<section class="record-row"><div><span class="history-mode">${r.mode}</span><small> · ${date} JST · v${r.testVersion}</small><br><b>${name}</b><p class="small muted">${summary}</p></div><div>${r.mode === "Daily" ? `<small>${Object.values(r.xp || {}).reduce((a, b) => a + b, 0)} XP / +${r.rc} RC</small>` : '<small class="muted">恒久XP・RCへの反映なし</small>'}${r.testId === "particle" && r.seed !== undefined ? button("再生", `replay-record-${r.attemptId || r.id}`, "text-button") : ""}</div></section>`;
           })
           .join("")}</div>`
       : '<div class="empty-state"><h2>まだ観測記録がありません。</h2><p class="muted">最初の試験から始めましょう。</p></div>') +
@@ -334,15 +330,59 @@ function settings() {
     `<p>第六感強化計画-PROJECT SIXTH-</p><label class="toggle-row">文字を大きくする<input id="large-text" type="checkbox" ${local.get("large-text", false) ? "checked" : ""}></label><label class="toggle-row">高コントラスト<input id="contrast" type="checkbox" ${local.get("contrast", false) ? "checked" : ""}></label><p class="small muted" style="margin-top:20px">本作は娯楽を目的としたゲームです。第六感・占術・直感に関する表示は科学的・医学的能力を保証するものではありません。</p><p class="small muted">匿名セッションで進行を保存します。ブラウザのCookieを削除すると、この端末から記録にアクセスできなくなります。複数端末への引き継ぎは未対応です。</p><div class="actions">${button("プレイ記録を保存", "export", "secondary")}${button("はじめての方へ", "welcome", "text-button")}</div>`,
   );
 }
+function namePanel() {
+  return `<section class="panel profile-section"><span class="eyebrow">SUBJECT NAME</span><h2>研究に残す名前</h2><label class="form-field">被験者名（任意・24文字まで）<input id="subject-name" maxlength="24" value="${escape(player?.displayName || "")}" placeholder="好きな名前で参加できます"></label><p class="small muted">共有画像にもこの名前を表示します。</p><button class="secondary" data-action="name-save">名前を保存</button></section>`;
+}
+function starterPrompt() {
+  return (
+    '<section class="panel starter-prompt"><div><h2>最初の仲間を選ぼう。</h2><p>6人の中から、同行する1人を選べます。</p></div>' +
+    button("仲間を選ぶ", "welcome") +
+    "</section>"
+  );
+}
 function welcome() {
   modal(
     "第六感強化計画へようこそ。",
-    `<p class="trial-instructions">あなたはこの計画の被験者です。まずは、★カードの練習から。</p><div class="result-metrics"><div class="metric"><b>01</b><span>訓練で慣れる</span></div><div class="metric"><b>02</b><span>Dailyで記録する</span></div><div class="metric"><b>03</b><span>仲間と戦う</span></div></div><p class="small muted">察知・予見・洞察・感応・共鳴の5つの研究値が育ちます。最初の仲間はジョセフ。300 RCで共鳴召喚も試せます。</p><p class="small muted">本作は娯楽です。第六感の科学的・医学的能力を保証しません。</p><div class="actions">${button("★カードを練習する", "training-card")}${button("研究所ロビーへ", "close", "secondary")}</div>`,
+    `<p>最初の仲間を1人選んでください。</p><div class="starter-grid">${starterIds
+      .map((id) => {
+        const c = char(id);
+        return `<button data-action="starter-${id}" class="starter-choice" ${player?.starterChosen ? "disabled" : ""}><img src="${c.face}" alt=""><b>${c.name}</b><small>${c.job}</small></button>`;
+      })
+      .join(
+        "",
+      )}</div><p class="small muted">名前と星のプロフィールは、被験結果解析で登録できます。</p><div class="actions">${button("研究所ロビーへ", "close", "secondary")}</div>`,
     "SUBJECT REGISTRATION",
   );
   local.set("welcomed", true);
 }
 async function action(name) {
+  if (name === "name-save") {
+    await mutate("/api/profile/name", {
+      name: document.querySelector("#subject-name").value,
+    });
+    toast("被験者名を保存しました。");
+    return;
+  }
+  if (name === "profile-apply") {
+    const p = savedProfile();
+    if (!p) throw Error("生年月日を入力してください。");
+    await mutate("/api/profile/baseline", { features: p.features });
+    toast("初期値へ反映しました。");
+    return;
+  }
+  if (name === "profile-reset") {
+    await mutate("/api/profile/baseline", { features: null });
+    return;
+  }
+  if (name.startsWith("starter-")) {
+    const id = Number(name.slice(8));
+    await mutate("/api/character/starter", { characterId: id });
+    battleCharacter = id;
+    closeModal();
+    toast(char(id).name + "が仲間になりました。");
+    return;
+  }
+
   if (name.startsWith("replay-record-")) {
     const id = name.slice(14);
     const h = [...(player?.history || []), ...local.get("training", [])].find(
@@ -356,6 +396,7 @@ async function action(name) {
     if (value && !mbtiNotes[value]) throw Error("タイプを確認してください。");
     local.set("mbti", value || null);
     renderMbti();
+    renderAstrology();
     return;
   }
   if (name === "mbti-clear") {
@@ -430,7 +471,7 @@ async function action(name) {
     const count = Number(name.split("-")[1]);
     modal(
       "共鳴召喚",
-      `<p>${count === 10 ? "900" : "100"} RCを使い、${count}回召喚します。</p><p class="small muted">全12名から均等に抽選。重複は欠片10個になります。</p>${button("召喚する", `summon-${count}`)}`,
+      `<p>${count === 10 ? "900" : "100"} RCを使い、${count}回召喚します。</p><p class="small muted">全${characters.length}名から均等に抽選。重複は欠片10個になります。</p>${button("召喚する", `summon-${count}`)}`,
     );
     return;
   }
@@ -481,6 +522,8 @@ async function action(name) {
       );
     local.set("birth-time", birthTime);
     local.set("birth-offset", offset);
+    local.set("mbti", document.querySelector("#mbti-type").value || null);
+    renderMbti();
     renderAstrology();
     return;
   }

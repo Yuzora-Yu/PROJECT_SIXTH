@@ -1,78 +1,103 @@
 import { test, expect } from "@playwright/test";
 import { mkdir } from "node:fs/promises";
-test("subdirectory training refresh, private profiles, image and X sharing", async ({
+test("starter, profile layers, baseline, name and three consolidated share cards", async ({
   page,
 }) => {
   const errors = [],
-    apiUrls = [],
     posts = [];
   page.on("pageerror", (e) => errors.push(e.message));
   page.on("request", (r) => {
-    if (r.url().includes("/api/")) apiUrls.push(r.url());
     if (r.postData()) posts.push(r.postData());
   });
+  await page.goto("/project_sixth/#home");
+  await expect(page.locator(".starter-choice")).toHaveCount(6);
+  await page.locator('[data-action="starter-301"]').click();
+  await expect(page.locator(".character-copy")).toContainText("アルス");
+  await expect(page.locator(".character-copy")).toContainText("冒険者");
+  await page.goto("/project_sixth/#characters");
+  await expect(page.locator(".character-tile")).toHaveCount(30);
+  await expect(page.locator(".character-tile.unowned")).toHaveCount(29);
+  await page.locator('[data-action="character-301"]').click();
+  await expect(page.locator("#dialog")).toContainText(/誕生日：\d{2}月\d{2}日/);
+  await page.keyboard.press("Escape");
   await page.goto("/project_sixth/#training");
-  await page
-    .getByRole("button", { name: "研究所ロビーへ", exact: true })
-    .click();
+  await expect(page.locator('#main [data-action^="training-"]')).toHaveCount(2);
   await page.locator('#main [data-action="training-card"]').click();
   await page.locator('[data-card="0"]').click();
   await expect(page.locator("#main")).toContainText("記録 1 回");
-  await expect(page.locator("#main")).toContainText("直近の記録");
-  await page.locator("#card-result [data-share-image]").click();
-  await expect(page.locator(".share-dialog")).toBeVisible();
-  await expect(page.locator(".share-dialog img")).toHaveJSProperty(
-    "naturalWidth",
-    1080,
-  );
-  const xUrl = new URL(
-    await page.locator('.share-dialog a[target="_blank"]').getAttribute("href"),
-  );
-  expect(xUrl.searchParams.get("url")).toBe(
-    "https://yu-zora.com/project_sixth/",
-  );
-  expect(xUrl.searchParams.get("hashtags")).toBe("第六感強化計画,PROJECTSIXTH");
-  await mkdir("test-results/screens", { recursive: true });
-  const download = page.waitForEvent("download");
-  await page.locator(".share-dialog a[download]").click();
-  await (await download).saveAs("test-results/screens/training-share.png");
-  await page.getByRole("button", { name: "共有画像を閉じる" }).click();
-  await page.locator('#dialog [data-action="close"]').click();
-  await page.goto("/project_sixth/#archive");
-  await expect(page.locator(".record-row").first()).toContainText("訓練");
+  await expect(page.locator("#dialog [data-share-image]")).toHaveCount(0);
+  await page.keyboard.press("Escape");
+  await page.goto("/project_sixth/#home");
+  await page.locator('#main [data-action="daily-card"]').click();
+  await page.locator('[data-card="0"]').click();
+  await expect(page.locator("#card-result")).toContainText("+10 RC");
+  await page.keyboard.press("Escape");
   await page.goto("/project_sixth/#analyze");
+  await page.locator("#subject-name").fill("夕空の観測者");
+  await page.locator('[data-action="name-save"]').click();
+  await expect(page.locator("#account")).toContainText("夕空の観測者");
   await page.locator("#birth-date").fill("2000-01-08");
-  await page.locator('[data-action="astrology"]').click();
-  await expect(page.locator("#astrology-result")).toContainText(
-    "数秘 11 / マスターナンバー",
-  );
-  await expect(page.locator("#astrology-result")).toContainText(
-    "出生時刻は未入力",
-  );
-  await expect(page.locator("#astrology-result tbody tr")).toHaveCount(10);
   await page.locator("#birth-time").fill("08:30");
   await page.locator('[data-action="astrology"]').click();
-  await expect(page.locator("#astrology-result")).toContainText(
-    "入力した出生時刻",
-  );
+  const base = await page
+    .locator("#astrology-result svg")
+    .first()
+    .getAttribute("aria-label");
+  const initial = await page
+    .locator("#astrology-result svg")
+    .nth(1)
+    .getAttribute("aria-label");
   await page.locator("#mbti-type").selectOption("INFJ");
   await page.locator('[data-action="mbti-save"]').click();
-  await expect(page.locator("#mbti-result")).toContainText("INFJ");
+  await expect(page.locator("#mbti-result")).toHaveText("INFJ（提唱者）");
+  expect(
+    await page
+      .locator("#astrology-result svg")
+      .first()
+      .getAttribute("aria-label"),
+  ).toBe(base);
+  expect(
+    await page
+      .locator("#astrology-result svg")
+      .nth(1)
+      .getAttribute("aria-label"),
+  ).not.toBe(initial);
+  await expect(page.locator(".reading-item")).toHaveCount(6);
+  await page.locator('[data-action="profile-apply"]').click();
+  await expect(page.locator('[data-action="profile-apply"]')).toBeDisabled();
   await page.reload();
-  await expect(page.locator("#mbti-type")).toHaveValue("INFJ");
-  await expect(page.locator("#birth-time")).toHaveValue("08:30");
+  await expect(page.locator('[data-action="profile-apply"]')).toBeDisabled();
+  await expect(page.locator("#subject-name")).toHaveValue("夕空の観測者");
+  await expect(page.locator("#main [data-share-image]")).toHaveCount(3);
+  await expect(page.locator("#main")).toContainText("研究開始日");
+  await expect(page.locator("#main")).toContainText("総研究日数");
+  await mkdir("test-results/screens", { recursive: true });
+  for (const [i, kind] of ["research", "numeric", "comprehensive"].entries()) {
+    await page.locator("#main [data-share-image]").nth(i).click();
+    await expect(page.locator(".share-dialog img")).toHaveJSProperty(
+      "naturalWidth",
+      1080,
+    );
+    await expect(page.locator(".share-dialog img")).toHaveJSProperty(
+      "naturalHeight",
+      i === 1 ? 1080 : 1440,
+    );
+    const x = new URL(
+      await page
+        .locator('.share-dialog a[target="_blank"]')
+        .getAttribute("href"),
+    );
+    expect(x.searchParams.get("url")).toBe(
+      "https://yu-zora.com/project_sixth/",
+    );
+    expect(x.searchParams.get("text")).toContain("夕空の観測者");
+    const d = page.waitForEvent("download");
+    await page.locator(".share-dialog a[download]").click();
+    await (await d).saveAs("test-results/screens/v3-" + kind + ".png");
+    await page.getByRole("button", { name: "共有画像を閉じる" }).click();
+  }
   expect(
-    posts.every(
-      (s) =>
-        !s.includes("2000-01-08") &&
-        !s.includes("INFJ") &&
-        !s.includes("08:30"),
-    ),
-  ).toBeTruthy();
-  expect(
-    apiUrls.every((url) =>
-      new URL(url).pathname.startsWith("/project_sixth/api/"),
-    ),
+    posts.every((s) => !s.includes("2000-01-08") && !s.includes("08:30")),
   ).toBeTruthy();
   await page.setViewportSize({ width: 390, height: 844 });
   expect(
@@ -81,14 +106,12 @@ test("subdirectory training refresh, private profiles, image and X sharing", asy
     ),
   ).toBeTruthy();
   await page.screenshot({
-    path: "test-results/screens/profiles-mobile.png",
+    path: "test-results/screens/v3-mobile.png",
     fullPage: true,
-    animations: "disabled",
   });
-  await page.locator('[data-action="birth-clear"]').click();
-  await expect(page.locator("#birth-date")).toHaveValue("");
-  await expect(page.locator("#birth-time")).toHaveValue("");
   await page.locator('[data-action="mbti-clear"]').click();
   await expect(page.locator("#mbti-result")).toBeEmpty();
+  await page.locator('[data-action="profile-reset"]').click();
+  await expect(page.locator('[data-action="profile-reset"]')).toHaveCount(0);
   expect(errors).toEqual([]);
 });

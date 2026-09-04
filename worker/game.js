@@ -8,11 +8,11 @@ import {
   senseStats,
   addXp,
   dailyCondition,
-  patternQuestions,
-  scorePattern,
 } from "../shared/core.js";
 import { scoreParticles } from "../shared/particles.js";
 import { characters } from "../data/prisma/catalog.js";
+import { calculateProfile } from "../shared/profile-model.js";
+export const starterIds = [101, 107, 301, 108, 110, 202];
 import { simulateBattle } from "../js/battle/prisma-adapter.js";
 export class GameError extends Error {
   constructor(message, status = 400) {
@@ -31,6 +31,9 @@ export function newPlayer(id, ms) {
     rc: config.economy.initialRC,
     senseXp: emptySenses(),
     profileIconCharacterId: 101,
+    starterChosen: false,
+    provisionalStarter: true,
+    displayName: "",
     characters: { 101: { exp: 0, shards: 0 } },
     attempts: {},
     history: [],
@@ -43,16 +46,20 @@ export function newPlayer(id, ms) {
 export function publicPlayer(p, ms) {
   const day = dayKey(ms),
     status = {};
-  for (const test of ["card", "particle", "pattern"])
+  for (const test of ["card", "particle"])
     status[test] = p.attempts[`${day}:${test}`]?.completed
       ? "complete"
       : "ready";
   return {
     id: p.id,
     createdAt: p.createdAt,
+    displayName: p.displayName || "",
+    starterChosen: Boolean(p.starterChosen),
+    profileBonus: p.profileBonus || emptySenses(),
+    profileApplied: Boolean(p.profileBonus),
     rc: p.rc,
     senseXp: p.senseXp,
-    senseStats: senseStats(p.senseXp),
+    senseStats: senseStats(p.senseXp, p.profileBonus),
     characters: p.characters,
     profileIconCharacterId: p.profileIconCharacterId,
     dailyStatus: status,
@@ -64,7 +71,7 @@ export function publicPlayer(p, ms) {
     pendingBattle: p.pendingBattle
       ? { id: p.pendingBattle.id, result: p.pendingBattle.result }
       : null,
-    history: p.history,
+    history: p.history.filter((h) => h.testId !== "pattern"),
     battleHistory: p.battleHistory.slice(-30),
   };
 }
@@ -89,8 +96,50 @@ function finish(p, a, result, ms) {
 }
 export function perform(p, path, body, ms) {
   const day = dayKey(ms);
+  if (path === "/api/profile/name") {
+    assert(
+      typeof body.name === "string" &&
+        [...body.name.trim()].length <= 24 &&
+        !/[\u0000-\u001f\u007f]/.test(body.name),
+      "名前は24文字以内で入力してください。",
+    );
+    p.displayName = body.name.trim();
+    return { name: p.displayName };
+  }
+  if (path === "/api/profile/baseline") {
+    let profile;
+    try {
+      profile = body.features === null ? null : calculateProfile(body.features);
+    } catch (e) {
+      throw new GameError(e.message);
+    }
+    p.profileBonus = profile?.bonus || null;
+    // Store only bounded game bonuses, never birth date, time, or personality input.
+    return { bonus: p.profileBonus || emptySenses() };
+  }
+  if (path === "/api/character/starter") {
+    assert(!p.starterChosen, "最初の仲間は登録済みです。", 409);
+    assert(
+      Number.isInteger(body.characterId) &&
+        starterIds.includes(body.characterId),
+      "最初の仲間を選んでください。",
+    );
+    if (
+      p.provisionalStarter &&
+      body.characterId !== 101 &&
+      p.characters[101]?.exp === 0 &&
+      p.characters[101]?.shards === 0 &&
+      !p.pendingBattle
+    )
+      delete p.characters[101];
+    p.characters[body.characterId] ||= { exp: 0, shards: 0 };
+    p.profileIconCharacterId = body.characterId;
+    p.starterChosen = true;
+    p.provisionalStarter = false;
+    return { characterId: body.characterId };
+  }
   let match = path.match(
-    /^\/api\/daily\/(card|particle|pattern)\/(start|answer|finish|cancel)$/,
+    /^\/api\/daily\/(card|particle)\/(start|answer|finish|cancel)$/,
   );
   if (match) {
     const [, test, action] = match,
@@ -120,6 +169,7 @@ export function perform(p, path, body, ms) {
       }
       // Refresh a measurement session on restart; discarded logs never earn rewards.
       if (test !== "card") {
+        a.testVersion = config.particleRuleVersion;
         a.id = crypto.randomUUID();
         a.startedAt = ms;
         a.seed = newSeed();
@@ -128,14 +178,6 @@ export function perform(p, path, body, ms) {
         attemptId: a.id,
         testVersion: a.testVersion,
         ...(test === "particle" ? { seed: a.seed } : {}),
-        ...(test === "pattern"
-          ? {
-              questions: patternQuestions(a.seed).map((q) => ({
-                id: q.id,
-                sequence: q.sequence,
-              })),
-            }
-          : {}),
       };
     }
     assert(
@@ -173,35 +215,8 @@ export function perform(p, path, body, ms) {
       );
     }
     assert(action === "finish", "操作が無効です。");
-    if (test === "pattern") {
-      assert(
-        ms - a.startedAt >= 5000 && ms - a.startedAt < 30 * 60000,
-        "試験時間が無効です。再開してください。",
-      );
-      assert(
-        Array.isArray(body.answers) &&
-          body.answers.length === 5 &&
-          body.answers.every(
-            (a) =>
-              Number.isInteger(a.selectedIndex) &&
-              a.selectedIndex >= 0 &&
-              a.selectedIndex < 4 &&
-              Number.isFinite(a.reactionMs) &&
-              a.reactionMs >= 0 &&
-              a.reactionMs < 1800000 &&
-              ["intuition", "reasoned", "unsure"].includes(a.selfReport),
-          ),
-        "回答ログが無効です。",
-      );
-      return finish(
-        p,
-        a,
-        scorePattern(patternQuestions(a.seed), body.answers),
-        ms,
-      );
-    }
     assert(
-      ms - a.startedAt >= config.particle.durationMs &&
+      ms - a.startedAt >= config.particle.durationByVersion[a.testVersion] &&
         ms - a.startedAt < 5 * 60000,
       "観測時間が無効です。再開してください。",
     );

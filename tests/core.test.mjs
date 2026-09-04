@@ -72,13 +72,13 @@ test("particle hits validated spatially, duplicates counted once, spam rejected"
 test("particle hit radius accepts nearby taps and preserves old rule scoring", () => {
   const taps = [{ ms: 4000, x: 901.7179740276188, y: 506.072233576117 }];
   assert.equal(scoreParticles(22, taps, 1).found, 0);
-  const current = scoreParticles(22, taps);
+  const current = scoreParticles(22, taps, 2);
   assert.equal(current.found, 1);
   assert.equal(current.hitRadius, 36);
   assert.equal(current.particleRuleVersion, 2);
   const p = newPlayer("legacy", time);
   const attempt = perform(p, "/api/daily/particle/start", {}, time);
-  assert.equal(attempt.testVersion, 2);
+  assert.equal(attempt.testVersion, 3);
   p.attempts[`${dayKey(time)}:particle`].testVersion = 1;
   const result = perform(
     p,
@@ -117,42 +117,12 @@ test("Daily gives rewards once; secret and seed are absent from public player", 
   assert.throws(() => perform(p, "/api/daily/card/start", {}, time));
   assert.ok(perform(p, "/api/daily/card/start", {}, time + 86400000).attemptId);
 });
-test("pattern scoring uses server generated answer and rejects too early finish", () => {
-  const p = newPlayer("x", time),
-    a = perform(p, "/api/daily/pattern/start", {}, time);
-  assert.ok(a.questions.every((q) => !Object.hasOwn(q, "answer")));
-  const q = patternQuestions(p.attempts[`${dayKey(time)}:pattern`].seed),
-    answers = q.map((q) => ({
-      selectedIndex: q.answer,
-      reactionMs: 1000,
-      selfReport: "intuition",
-    }));
-  assert.throws(() =>
-    perform(
-      p,
-      "/api/daily/pattern/finish",
-      { attemptId: a.attemptId, answers },
-      time + 100,
-    ),
-  );
-  assert.equal(
-    perform(
-      p,
-      "/api/daily/pattern/finish",
-      { attemptId: a.attemptId, answers },
-      time + 6000,
-    ).correct,
-    5,
-  );
-  const before = JSON.stringify(p);
-  scorePattern(q, answers);
-  scoreParticles(10, []);
-  assert.equal(
-    JSON.stringify(p),
-    before,
-    "Training computations cannot mutate player",
-  );
+test("retired trial has no public entry or mutation", () => {
+  const p = newPlayer("x", time);
+  assert.throws(() => perform(p, "/api/daily/pattern/start", {}, time));
+  assert.equal(publicPlayer(p, time).dailyStatus.pattern, undefined);
 });
+
 test("invalidated particle attempt grants retry; stale session cannot finish", () => {
   const p = newPlayer("x", time),
     a = perform(p, "/api/daily/particle/start", {}, time);

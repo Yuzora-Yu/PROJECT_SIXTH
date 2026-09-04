@@ -1,15 +1,7 @@
-import { shareButtons } from "./sharing.js";
 import { trialComment } from "../shared/profiles.js";
 import { researcherNote } from "./profile-ui.js";
 import { config } from "../shared/config.js";
-import {
-  newSeed,
-  randomInt,
-  emptySenses,
-  patternQuestions,
-  scorePattern,
-  iso,
-} from "../shared/core.js";
+import { newSeed, randomInt, emptySenses, iso } from "../shared/core.js";
 import {
   particleScene,
   particlePosition,
@@ -49,15 +41,16 @@ function reward(result, daily) {
     : '<p class="small muted">訓練記録を保存しました。恒久XP・RCへの反映はありません。</p>';
 }
 export async function launchTest(test, daily, mutate) {
+  if (!["card", "particle"].includes(test))
+    throw Error("試験を選んでください。");
   const label = {
     card: "★カード感応試験",
     particle: "粒子総合観測試験",
-    pattern: "潜在法則予測試験",
   }[test];
   if (test === "particle") {
     modal(
       label,
-      `<p class="trial-instructions">60秒間、通常の動きから外れた粒子をタップしてください。逸脱・予兆・突発出現・不同調・異質の5種類、計16イベントを観測します。</p><p class="small muted">100個の粒子が動きます。スマホでは横向きも利用できます。画面を離れる、または低FPSが続く場合は無効になり、再挑戦できます。</p><div class="actions"><button id="particle-begin" class="primary">性能確認して開始</button>${button("閉じる", "close", "secondary")}</div>`,
+      `<p class="trial-instructions">30秒間、通常の動きから外れた粒子をタップしてください。逸脱・予兆・突発出現・不同調・異質の5種類、計16イベントを観測します。</p><p class="small muted">100個の粒子が動きます。スマホでは横向きも利用できます。画面を離れる、または低FPSが続く場合は無効になり、再挑戦できます。</p><div class="actions"><button id="particle-begin" class="primary">性能確認して開始</button>${button("閉じる", "close", "secondary")}</div>`,
       daily ? "DAILY / PARTICLE" : "TRAINING / PARTICLE",
     );
     document.querySelector("#particle-begin").onclick = async (e) => {
@@ -75,7 +68,6 @@ export async function launchTest(test, daily, mutate) {
     ? (await mutate(`/api/daily/${test}/start`, {})).result
     : null;
   if (test === "card") cardTest(daily, mutate, started);
-  else patternTest(daily, mutate, started);
 }
 function cardTest(daily, mutate, started) {
   let answer = daily ? null : randomInt(5),
@@ -133,93 +125,6 @@ function cardTest(daily, mutate, started) {
       }),
   );
 }
-function patternTest(daily, mutate, started) {
-  const seed = newSeed(),
-    questions = daily ? started.questions : patternQuestions(seed),
-    answers = [];
-  let index = 0,
-    timer = null,
-    stopped = false;
-  function next() {
-    const q = questions[index];
-    modal(
-      `潜在法則を観測する　${index + 1} / 5`,
-      `<p class="trial-instructions">記号の順番を観測して、次の記号を選んでください。</p><div class="pattern-sequence">${q.sequence.map((s, i) => `<span class="pattern-symbol" id="symbol-${i}" aria-label="観測 ${i + 1}">·</span>`).join("")}</div><p id="pattern-prompt" class="muted">観測中…</p><div class="pattern-choices">${symbols.map((s, i) => `<button data-choice="${i}" aria-label="${s}を選択" disabled>${s}</button>`).join("")}</div><label class="self-report">選んだ感覚（任意）<select id="self-report"><option value="unsure">どちらともいえない</option><option value="intuition">勘だった</option><option value="reasoned">法則が分かった</option></select></label><div id="pattern-save"></div>`,
-      daily ? "DAILY / HIDDEN PATTERN" : "TRAINING / HIDDEN PATTERN",
-    );
-    stopped = false;
-    let observed = 0,
-      shownAt = 0;
-    timer = setInterval(() => {
-      if (stopped) return;
-      document
-        .querySelectorAll(".pattern-symbol")
-        .forEach((e) => e.classList.remove("active"));
-      if (observed < 8) {
-        const el = document.querySelector(`#symbol-${observed}`);
-        el.textContent = symbols[q.sequence[observed]];
-        el.classList.add("active");
-        observed++;
-      } else {
-        clearInterval(timer);
-        shownAt = performance.now();
-        document.querySelector("#pattern-prompt").textContent =
-          "次に現れる記号は？";
-        document
-          .querySelectorAll("[data-choice]")
-          .forEach((b) => (b.disabled = false));
-      }
-    }, 650);
-    setCleanup(() => {
-      stopped = true;
-      clearInterval(timer);
-    });
-    document.querySelectorAll("[data-choice]").forEach(
-      (b) =>
-        (b.onclick = async () => {
-          document
-            .querySelectorAll("[data-choice]")
-            .forEach((b) => (b.disabled = true));
-          answers.push({
-            selectedIndex: Number(b.dataset.choice),
-            reactionMs: Math.round(performance.now() - shownAt),
-            selfReport: document.querySelector("#self-report").value,
-          });
-          if (++index < 5) {
-            next();
-            return;
-          }
-          const save = async () => {
-            try {
-              const result = daily
-                ? (
-                    await mutate("/api/daily/pattern/finish", {
-                      attemptId: started.attemptId,
-                      answers,
-                    })
-                  ).result
-                : scorePattern(patternQuestions(seed), answers);
-              if (!daily) recordTraining("pattern", result);
-              modal(
-                "潜在法則の観測結果",
-                `<div class="result-metrics"><div class="metric"><b>${result.correct} / 5</b><span>正解数</span></div><div class="metric"><b>${(answers.reduce((s, a) => s + a.reactionMs, 0) / 5000).toFixed(2)}秒</b><span>平均回答時間</span></div></div>${reward(result, daily)}${resultExtras("pattern", result, daily)}<table class="data-table"><thead><tr><th>問</th><th>結果</th><th>潜んでいた法則</th></tr></thead><tbody>${result.details.map((d, i) => `<tr><td>${i + 1}</td><td>${d.correct ? "✓ 正解" : "—"} ${symbols[d.answer]}</td><td>${d.rule}</td></tr>`).join("")}</tbody></table><div class="actions" style="margin-top:20px">${button("閉じる", "close")}${button("訓練でもう一度", "training-pattern", "secondary")}</div>`,
-              );
-            } catch (e) {
-              toast(e.message);
-              const el = document.querySelector("#pattern-save");
-              if (el) {
-                el.innerHTML =
-                  '<button id="pattern-retry" class="primary">結果の保存を再試行</button>';
-                document.querySelector("#pattern-retry").onclick = save;
-              }
-            }
-          };
-          await save();
-        }),
-    );
-  }
-  next();
-}
 function drawScene(ctx, scene, ms, reveal = false) {
   const { width, height } = config.particle;
   ctx.fillStyle = "#060e17";
@@ -261,8 +166,8 @@ function drawScene(ctx, scene, ms, reveal = false) {
     }
   }
 }
-function prepareScene(seed) {
-  const s = particleScene(seed);
+function prepareScene(seed, version = config.particleRuleVersion) {
+  const s = particleScene(seed, version);
   s.eventMap = new Map(s.events.map((e) => [e.particleId, e]));
   for (const p of s.particles) p.renderPosition = {};
   return s;
@@ -304,7 +209,7 @@ async function particleTest(daily, mutate) {
     lowTime = 0;
   modal(
     "粒子総合観測試験",
-    '<div class="trial-toolbar"><span id="particle-status">3秒間の性能確認中…</span><b class="timer" id="particle-timer">60.0</b></div><canvas id="particle-canvas" class="particle-canvas" width="960" height="540" aria-label="異常を見つけた粒子をタップする観測エリア"></canvas><p class="trial-note">異常を感じた粒子をタップ。入力間隔は0.5秒です。画面を離れると無効になります。</p>',
+    '<div class="trial-toolbar"><span id="particle-status">3秒間の性能確認中…</span><b class="timer" id="particle-timer">30.0</b></div><canvas id="particle-canvas" class="particle-canvas" width="960" height="540" aria-label="異常を見つけた粒子をタップする観測エリア"></canvas><p class="trial-note">気になった場所を指で示してください。円の範囲で受け付けます。入力間隔は0.5秒です。</p>',
     daily ? "DAILY / PARTICLE" : "TRAINING / PARTICLE",
   );
   const canvas = document.querySelector("#particle-canvas"),
@@ -345,7 +250,7 @@ async function particleTest(daily, mutate) {
   if (daily) {
     started = (await mutate("/api/daily/particle/start", {})).result;
     seed = started.seed;
-    scene = prepareScene(seed);
+    scene = prepareScene(seed, started.testVersion);
   }
   if (stopped) {
     if (daily && started)
@@ -354,6 +259,8 @@ async function particleTest(daily, mutate) {
       }).catch(() => {});
     return;
   }
+  const version = started?.testVersion || config.particleRuleVersion;
+  const duration = config.particle.durationByVersion[version];
   active = true;
   start = performance.now();
   last = start;
@@ -362,7 +269,7 @@ async function particleTest(daily, mutate) {
   canvas.addEventListener("pointerdown", (e) => {
     if (!active) return;
     const ms = performance.now() - start;
-    if (ms - lastTap < 500 || ms > 60000) return;
+    if (ms - lastTap < 500 || ms > duration) return;
     const r = canvas.getBoundingClientRect();
     taps.push({
       ms: Math.round(ms),
@@ -407,11 +314,27 @@ async function particleTest(daily, mutate) {
       invalidate("低いフレームレートが続いたため、測定を無効にしました。");
       return;
     }
-    drawScene(ctx, scene, Math.min(elapsed, 60000));
+    drawScene(ctx, scene, Math.min(elapsed, duration));
+    const tap = taps.at(-1);
+    if (tap && elapsed - tap.ms < 350) {
+      ctx.strokeStyle = "#91ead0";
+      ctx.fillStyle = "#91ead012";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(
+        tap.x,
+        tap.y,
+        config.particle.hitRadiusByVersion[version],
+        0,
+        Math.PI * 2,
+      );
+      ctx.fill();
+      ctx.stroke();
+    }
     document.querySelector("#particle-timer").textContent = (
-      Math.max(0, 60000 - elapsed) / 1000
+      Math.max(0, duration - elapsed) / 1000
     ).toFixed(1);
-    if (elapsed >= 60000) {
+    if (elapsed >= duration) {
       active = false;
       stopped = true;
       document.removeEventListener("visibilitychange", onHidden);
@@ -424,12 +347,14 @@ async function particleTest(daily, mutate) {
   raf = requestAnimationFrame(frame);
 }
 export function replayParticles(seed, result) {
+  const version = result.particleRuleVersion || result.testVersion || 1;
+  const duration = config.particle.durationByVersion[version];
   modal(
     "観測の答え合わせ",
-    `<p class="small muted">オレンジのリングが、その時点で発生していた異常です。</p><canvas id="replay-canvas" class="particle-canvas" width="960" height="540" aria-label="異常粒子のリプレイ"></canvas><div class="replay-controls"><button id="replay-play" class="secondary">再生</button><input id="replay-time" type="range" min="0" max="60000" value="6000" step="100" aria-label="再生位置"><span id="replay-value">6.0秒</span></div><p class="small muted">発見 ${result.found} / 16 · 同じシードから観測を再現しています。</p>`,
+    `<p class="small muted">オレンジのリングが、その時点で発生していた異常です。</p><canvas id="replay-canvas" class="particle-canvas" width="960" height="540" aria-label="異常粒子のリプレイ"></canvas><div class="replay-controls"><button id="replay-play" class="secondary">再生</button><input id="replay-time" type="range" min="0" max="${duration}" value="6000" step="100" aria-label="再生位置"><span id="replay-value">6.0秒</span></div><p class="small muted">発見 ${result.found} / 16 · 同じシードから観測を再現しています。</p>`,
     "PARTICLE REPLAY",
   );
-  const scene = prepareScene(seed),
+  const scene = prepareScene(seed, version),
     canvas = document.querySelector("#replay-canvas"),
     slider = document.querySelector("#replay-time");
   let timer = null;
@@ -448,7 +373,7 @@ export function replayParticles(seed, result) {
     }
     e.target.textContent = "停止";
     timer = setInterval(() => {
-      slider.value = (Number(slider.value) + 100) % 60001;
+      slider.value = (Number(slider.value) + 100) % (duration + 1);
       draw();
     }, 100);
   };
@@ -456,29 +381,6 @@ export function replayParticles(seed, result) {
   draw();
 }
 
-function resultExtras(test, result, daily) {
-  const title =
-    (daily ? "Daily" : "訓練") +
-    " / " +
-    { card: "★カード感応", particle: "粒子観測", pattern: "潜在法則" }[test];
-  const summary =
-    test === "card"
-      ? result.correct
-        ? "★を発見"
-        : "今回は不的中"
-      : test === "particle"
-        ? `${result.found} / 16 発見・誤検知 ${result.falsePositives}`
-        : `${result.correct} / 5 正解`;
-  const comment = trialComment(test, result);
-  return (
-    researcherNote(comment) +
-    shareButtons({
-      title,
-      summary,
-      comment,
-      note: daily
-        ? "Dailyの測定記録。能力の科学的な証明ではありません。"
-        : "トレーニングの記録。恒久XP・RCへの反映はありません。",
-    })
-  );
+function resultExtras(test, result) {
+  return researcherNote(trialComment(test, result));
 }
