@@ -26,6 +26,15 @@
   </head>
   <body>
     <a class="skip-link" href="#main">本文へ移動</a>
+    <div class="terminal-entry" aria-hidden="true">
+      <div class="terminal-entry__noise"></div>
+      <div class="terminal-entry__scan"></div>
+      <div class="terminal-entry__readout">
+        <span>SUBJECT TERMINAL / ACCESS</span>
+        <strong>OBSERVATION SYSTEM</strong>
+        <small>LINK ESTABLISHED</small>
+      </div>
+    </div>
     <div class="app-shell">
       <aside class="sidebar">
         <a class="brand" href="#home" aria-label="PROJECT SIXTH ホーム"
@@ -38,7 +47,7 @@
         <nav id="navigation" aria-label="メインメニュー"></nav>
         <div class="sidebar-bottom">
           <span class="live-dot"></span> SUBJECT TERMINAL<br /><small
-            >OBSERVATION SYSTEM / v0.4.1</small
+            >OBSERVATION SYSTEM / v0.4.2</small
           ><button class="text-button" data-action="settings">
             設定・この計画について ↗
           </button>
@@ -82,6 +91,13 @@
       </div>
       <div id="dialog-content"></div>
     </dialog>
+    <div
+      id="access-bonus"
+      class="access-bonus"
+      role="status"
+      aria-live="polite"
+      aria-atomic="true"
+    ></div>
     <div id="toast" role="status" aria-live="polite"></div>
   </body>
 </html>

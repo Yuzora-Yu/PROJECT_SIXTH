@@ -39,7 +39,7 @@ function recordTraining(testId, result) {
 }
 function reward(result, daily) {
   return daily
-    ? `${xpHtml(result.xp)}<p class="small muted" style="margin-top:12px">本日の研究記録を保存しました。+10 RC</p>`
+    ? `${xpHtml(result.xp)}<p class="small muted" style="margin-top:12px">本日の研究記録を保存しました。+${result.rc} RC</p>`
     : '<p class="small muted">訓練記録を保存しました。恒久XP・RCへの反映はありません。</p>';
 }
 export async function launchTest(test, daily, mutate) {

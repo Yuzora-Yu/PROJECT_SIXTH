@@ -1,5 +1,5 @@
 export const config = Object.freeze({
-  gameVersion: "0.4.1",
+  gameVersion: "0.4.2",
   testVersion: 1,
   particleRuleVersion: 5,
   battleCoreVersion: 1,
@@ -24,12 +24,19 @@ export const config = Object.freeze({
   },
   economy: {
     initialRC: 300,
-    dailyRC: 10,
+    dailyAccessRC: 100,
+    dailyTestRC: { card: 20, particle: 30 },
     drawCost: 100,
     tenDrawCost: 900,
     duplicateShards: 10,
   },
-  battle: { dailyLimit: 5, winRC: 10, winEXP: 20, loseEXP: 5, maxTurns: 12 },
+  battle: {
+    dailyLimit: 5,
+    completionRC: 10,
+    winEXP: 20,
+    loseEXP: 5,
+    maxTurns: 12,
+  },
   senses: ["awareness", "foresight", "insight", "intuition", "resonance"],
   labels: {
     awareness: "察知",

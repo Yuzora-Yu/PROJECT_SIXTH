@@ -139,3 +139,7 @@
 - `scripts/google-sheets-bridge.py` — Google OIDC tokenを使う固定Sheetのexport、公開計画、atomic確定更新。
 - `tests/test_google_sheets_bridge.py` — NOOP、競合、冪等監査、限定セル更新、XLSX検査を確認。
 - `docs/PREDICTION_AUTOMATION.md` — Google Cloud、GitHub、Cloudflareの設定と運用手順。
+
+## v0.4.2で追加
+
+- `tests/economy.test.mjs` — カード、粒子、戦闘5回の活動報酬が合計100 RCになることと、開始済み戦闘の新報酬への移行を検証。

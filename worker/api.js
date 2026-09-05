@@ -60,6 +60,37 @@ async function readBody(request) {
     throw new GameError("送信内容を確認してください。");
   }
 }
+async function claimDailyAccessBonus(db, row, ms) {
+  const dayJst = dayKey(ms),
+    amount = config.economy.dailyAccessRC;
+  const claimed = await db
+    .prepare(
+      `UPDATE players
+       SET data=json_set(
+             data,
+             '$.rc', COALESCE(json_extract(data, '$.rc'), 0) + ?,
+             '$.lastAccessBonusDayJst', ?
+           ),
+           revision=revision+1
+       WHERE id=?
+         AND COALESCE(json_extract(data, '$.lastAccessBonusDayJst'), '')<>?`,
+    )
+    .bind(amount, dayJst, row.id, dayJst)
+    .run();
+  const current = await db
+    .prepare("SELECT * FROM players WHERE id=?")
+    .bind(row.id)
+    .first();
+  if (!current) throw new GameError("研究記録を読み込めませんでした。", 503);
+  return {
+    row: current,
+    accessBonus: {
+      awarded: claimed.meta.changes === 1,
+      amount,
+      dayJst,
+    },
+  };
+}
 export async function handleApi(request, db, clock = now, cookiePath = "/") {
   const url = new URL(request.url),
     ms = clock();
@@ -110,6 +141,15 @@ export async function handleApi(request, db, clock = now, cookiePath = "/") {
       cookie = `sixth_session=${secret}; Path=${cookiePath}; HttpOnly; SameSite=Strict; Max-Age=31536000${url.protocol === "https:" ? "; Secure" : ""}`;
     }
     const headers = cookie ? { "Set-Cookie": cookie } : {};
+    let accessBonus;
+    if (
+      request.method === "GET" &&
+      ["/api/bootstrap", "/api/me"].includes(url.pathname)
+    ) {
+      const claim = await claimDailyAccessBonus(db, row, ms);
+      row = claim.row;
+      accessBonus = claim.accessBonus;
+    }
     const p = JSON.parse(row.data);
     if (
       request.method === "GET" &&
@@ -119,6 +159,7 @@ export async function handleApi(request, db, clock = now, cookiePath = "/") {
         {
           serverTime: iso(ms),
           dateJst: dayKey(ms),
+          accessBonus,
           player: publicPlayer(p, ms),
         },
         200,

@@ -158,15 +158,16 @@ test("Daily gives rewards once; secret and seed are absent from public player", 
     time + 1000,
   );
   assert.equal(r.correct, true);
-  assert.equal(p.rc, 310);
+  assert.equal(p.rc, 320);
   assert.equal(p.senseXp.intuition, 6);
-  perform(
+  const repeated = perform(
     p,
     "/api/daily/card/answer",
     { attemptId: start.attemptId, selectedIndex: answer },
     time + 2000,
   );
-  assert.equal(p.rc, 310);
+  assert.equal(repeated.rc, 20);
+  assert.equal(p.rc, 320);
   assert.throws(() => perform(p, "/api/daily/card/start", {}, time));
   assert.ok(perform(p, "/api/daily/card/start", {}, time + 86400000).attemptId);
 });

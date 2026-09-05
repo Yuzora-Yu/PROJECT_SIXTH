@@ -23,9 +23,9 @@ test("desktop and phone journeys, daily/training, summon, battle, privacy and re
   await page.locator('[data-action="training-card"]').count();
   await page.locator('[data-action="daily-card"]').click();
   await page.locator('[data-card="0"]').click();
-  await expect(page.locator("#card-result")).toContainText("+10 RC");
+  await expect(page.locator("#card-result")).toContainText("+20 RC");
   await page.locator('[data-action="close"]').click();
-  await expect(page.locator("#account")).toContainText("310");
+  await expect(page.locator("#account")).toContainText("420");
   await page.locator('[data-action="daily-card"]').click();
   await expect(page.locator("#dialog-title")).toHaveText(
     "本日の試験は完了しました。",
@@ -36,7 +36,7 @@ test("desktop and phone journeys, daily/training, summon, battle, privacy and re
     "恒久XP・RCへの反映はありません",
   );
   await page.locator('[data-action="close"]').click();
-  await expect(page.locator("#account")).toContainText("310");
+  await expect(page.locator("#account")).toContainText("420");
   await page.goto("/#characters");
   await expect(
     page.getByRole("heading", { name: "共鳴する、仲間たち。" }),
@@ -47,7 +47,7 @@ test("desktop and phone journeys, daily/training, summon, battle, privacy and re
     "共鳴が応答しました。",
   );
   await page.locator('[data-action="close"]').click();
-  await expect(page.locator("#account")).toContainText("210");
+  await expect(page.locator("#account")).toContainText("320");
   await page.goto("/#battle");
   await page.locator('[data-action="battle-start"]').click();
   await expect(page.locator('[data-action^="battle-finish-"]')).toBeVisible({
@@ -68,7 +68,7 @@ test("desktop and phone journeys, daily/training, summon, battle, privacy and re
   await expect(page.locator("#birth-date")).toHaveValue("");
   await page.goto("/#prediction");
   await expect(page.getByRole("heading", { name: "現実予測" })).toBeVisible();
-  await expect(page.locator(".prediction-card")).toHaveCount(6);
+  await expect(page.locator(".prediction-card")).toHaveCount(12);
   await expect(page.locator("#main")).not.toContainText("開発中");
   const firstPrediction = page.locator(".prediction-card").first();
   const firstChoice = firstPrediction.locator(".prediction-choice").first();
@@ -129,7 +129,7 @@ test("30-second particle daily completes and replay renders", async ({
   await expect(page.locator("#dialog-title")).toHaveText("粒子観測の結果", {
     timeout: 45000,
   });
-  await expect(page.locator("#account")).toContainText("310");
+  await expect(page.locator("#account")).toContainText("430");
   await page.locator("#particle-replay").click();
   await expect(page.locator("#dialog-title")).toHaveText("観測の答え合わせ");
   await page.locator("#replay-time").fill("25000");
@@ -145,7 +145,7 @@ test("particle exit returns the daily right without rewards", async ({
     timeout: 10000,
   });
   await page.keyboard.press("Escape");
-  await expect(page.locator("#account")).toContainText("300");
+  await expect(page.locator("#account")).toContainText("400");
   await page.locator('[data-action="daily-particle"]').click();
   await expect(page.locator("#particle-begin")).toBeVisible();
 });

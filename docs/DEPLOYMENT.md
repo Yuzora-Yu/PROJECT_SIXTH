@@ -2,31 +2,30 @@
 
 公開URL: https://yu-zora.com/project_sixth/
 
-- アプリ / 公開API: v0.4.1
+- アプリ / 公開API: v0.4.2
 - Worker: `project-sixth`
-- Worker version: `50809065-ac7e-40ad-9ac9-02213ea42f68`
-- Worker version作成: 2026-09-05 14:30:03 JST
+- Worker version: `eda8544d-1dce-4dc3-86ed-13ffc4797b7f`
+- Worker version作成: 2026-09-05 16:37:06 JST
 - D1: `project-sixth` / `410a83bb-0907-4ac0-8a1c-110152eba20e`（既存）
 - Bindings: 既存のD1 `DB` と静的アセット `ASSETS` のみ
 - Routes: `yu-zora.com/project_sixth`、`yu-zora.com/project_sixth/*`（既存ルートを維持）
 
-## v0.4.1の配信内容
+## v0.4.2の配信内容
 
-- 全画面共通フッターに「YU-ZORAトップ」「プライバシーポリシー」「利用規約」「免責事項」「お問い合わせ」の5リンクを追加しました。
-- 各リンクのタップ領域を44px以上確保し、スマホ幅でも読みやすく折り返すよう調整しました。
-- 公開承認と公開時刻を満たす現実予測を最大6件ずつ検証し、既存Workerへ反映してSheetへ書き戻す専用GitHub Actionsを追加しました。
+- アクセス時にノイズ、走査線、信号帯、端末接続表示を約1.15秒表示する演出を追加しました。操作を遮らず、OSの動きを減らす設定では省略します。
+- 毎日04:00 JST以降の初回アクセス時に100 RCを付与し、画面上で取得を通知します。同時アクセス時もD1の条件付き更新で1回だけ付与します。
+- カード20 RC、粒子30 RC、戦闘完了1回10 RC・1日5回として、毎日の活動報酬を合計100 RCに調整しました。研究所アクセスボーナス100 RCは別枠です。
 
-## v0.4.1の確認結果
+## v0.4.2の確認結果
 
-- 公開HTMLがHTTP 200を返し、共通フッターの5リンクが含まれることを確認。
-- bootstrapがHTTP 200を返し、公開APIのversionがv0.4.1であることを確認。
-- [dry-run](https://github.com/Yuzora-Yu/PROJECT_SIXTH/actions/runs/33950745512)はcommit `9814476`から公開予定6件を検証し、Git・Cloudflare・Google Sheetへの変更なしで成功。
-- [本番公開](https://github.com/Yuzora-Yu/PROJECT_SIXTH/actions/runs/33950796966)はcommit `9814476`から6件を公開し、生成commit `a140757`の本番確認とGoogle Sheetへの原子的な書き戻しを2026-09-05 15:48:43 JSTに完了。
-- Google認証はGitHub OIDCとWorkload Identity Federationを使用し、サービスアカウントキー、OAuthクライアントシークレット、個人用refresh tokenは使用していません。
-- モバイル用Playwright: 2件中2件成功。
+- 公開HTMLがHTTP 200を返し、端末接続演出とアクセスボーナス通知の要素、v0.4.2表記が含まれることを確認。
+- 本番の新規匿名セッションで初回bootstrapが400 RCと `awarded: true` を返し、同じCookieによる再取得が400 RCのまま `awarded: false` になることを確認。
+- 自動検証で、試験2種と戦闘5回の活動報酬が合計100 RC、アクセスボーナスを含めた最大獲得量が200 RC/日になることを確認。
+- 390px幅の本番画面で端末接続演出、アクセスボーナス通知、横あふれ0pxを確認。
+- Playwright: 8件中8件成功。
 - Pythonテスト: prediction importer 10件、Google Sheets bridge 24件の計34件中34件成功。
-- Nodeテスト: 34件中34件成功。
-- 本番配信用build成功。
+- Nodeテスト: 38件中38件成功。
+- Wrangler 4.129.0によるdry-runと本番配信が成功。既存D1 `DB` と静的アセット `ASSETS` だけを使用。
 
 ## Cloudflareの構成と料金方針
 
@@ -45,9 +44,26 @@ npm run check
 npm run deploy
 ```
 
-v0.4.1ではD1 migrationを追加していません。
+v0.4.2ではD1 migrationを追加していません。アクセスボーナスの取得日は既存プレイヤーJSON内に保存します。
 
 ## 過去の配信履歴
+
+### v0.4.1 — 2026-09-05
+
+#### 配信内容
+
+- 全画面共通フッターに「YU-ZORAトップ」「プライバシーポリシー」「利用規約」「免責事項」「お問い合わせ」の5リンクを追加しました。
+- 各リンクのタップ領域を44px以上確保し、スマホ幅でも読みやすく折り返すよう調整しました。
+- 公開承認と公開時刻を満たす現実予測を最大6件ずつ検証し、既存Workerへ反映してSheetへ書き戻す専用GitHub Actionsを追加しました。
+
+#### 確認結果
+
+- Worker version: `50809065-ac7e-40ad-9ac9-02213ea42f68`（2026-09-05 14:30:03 JST作成）
+- 公開HTMLがHTTP 200を返し、共通フッターの5リンクが含まれることを確認。
+- 公開APIのversionがv0.4.1であることを確認。
+- [dry-run](https://github.com/Yuzora-Yu/PROJECT_SIXTH/actions/runs/33950745512)はcommit `9814476`から公開予定6件を検証し、Git・Cloudflare・Google Sheetへの変更なしで成功。
+- [本番公開](https://github.com/Yuzora-Yu/PROJECT_SIXTH/actions/runs/33950796966)はcommit `9814476`から6件を公開し、生成commit `a140757`の本番確認とGoogle Sheetへの原子的な書き戻しを2026-09-05 15:48:43 JSTに完了。
+- Google認証はGitHub OIDCとWorkload Identity Federationを使用し、サービスアカウントキー、OAuthクライアントシークレット、個人用refresh tokenは使用していません。
 
 ### v0.4.0 — 2026-09-05
 

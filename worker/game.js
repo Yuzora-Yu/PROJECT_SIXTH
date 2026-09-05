@@ -108,6 +108,10 @@ export function publicPredictions(p, ms) {
   };
 }
 
+function currentBattleResult(result) {
+  return { ...result, rc: config.battle.completionRC };
+}
+
 export function publicPlayer(p, ms) {
   const day = dayKey(ms),
     status = {};
@@ -141,7 +145,10 @@ export function publicPlayer(p, ms) {
     pendingBattle:
       p.pendingBattle &&
       isAvailableCharacter(p.pendingBattle.result.characterId)
-        ? { id: p.pendingBattle.id, result: p.pendingBattle.result }
+        ? {
+            id: p.pendingBattle.id,
+            result: currentBattleResult(p.pendingBattle.result),
+          }
         : null,
     history: p.history.filter((h) => h.testId !== "pattern"),
     battleHistory: p.battleHistory
@@ -150,11 +157,11 @@ export function publicPlayer(p, ms) {
   };
 }
 function finish(p, a, result, ms) {
+  const rc = config.economy.dailyTestRC[a.test];
   a.completed = true;
   a.finishedAt = iso(ms);
-  a.result = result;
   addXp(p, result.xp);
-  p.rc += config.economy.dailyRC;
+  p.rc += rc;
   const record = {
     attemptId: a.id,
     testId: a.test,
@@ -163,8 +170,9 @@ function finish(p, a, result, ms) {
     finishedAt: iso(ms),
     seed: a.seed,
     ...result,
-    rc: config.economy.dailyRC,
+    rc,
   };
+  a.result = record;
   p.history.push(record);
   return record;
 }
@@ -177,6 +185,7 @@ export function perform(p, path, body, ms) {
     !isAvailableCharacter(p.pendingBattle.result.characterId)
   ) {
     const battle = p.pendingBattle;
+    battle.result = currentBattleResult(battle.result);
     p.rc += battle.result.rc;
     p.characters[battle.result.characterId].exp += battle.result.exp;
     p.battleHistory.push({ ...battle, finishedAt: iso(ms) });
@@ -399,8 +408,10 @@ export function perform(p, path, body, ms) {
     return { exp: c.exp, shards: c.shards };
   }
   if (path === "/api/battle/start") {
-    if (p.pendingBattle)
+    if (p.pendingBattle) {
+      p.pendingBattle.result = currentBattleResult(p.pendingBattle.result);
       return { id: p.pendingBattle.id, result: p.pendingBattle.result };
+    }
     if (p.battleDay !== day) {
       p.battleDay = day;
       p.battleCount = 0;
@@ -438,6 +449,7 @@ export function perform(p, path, body, ms) {
     const previous = p.battleHistory.find((b) => b.id === body.battleId);
     if (previous) return previous;
     assert(b && b.id === body.battleId, "戦闘記録が見つかりません。", 409);
+    b.result = currentBattleResult(b.result);
     p.rc += b.result.rc;
     p.characters[b.result.characterId].exp += b.result.exp;
     const record = { ...b, finishedAt: iso(ms) };

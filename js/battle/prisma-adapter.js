@@ -86,7 +86,7 @@ export function simulateBattle(
     win,
     turns,
     bonuses: b,
-    rc: win ? config.battle.winRC : 0,
+    rc: config.battle.completionRC,
     exp: win ? config.battle.winEXP : config.battle.loseEXP,
   };
 }

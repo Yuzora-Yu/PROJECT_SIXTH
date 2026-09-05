@@ -20,6 +20,7 @@ import {
   modal,
   closeModal,
   toast,
+  showAccessBonus,
   setCleanup,
 } from "./ui.js";
 import { launchTest, replayParticles } from "./trials.js";
@@ -31,6 +32,9 @@ let player = null,
 let observedDay = null,
   predictionData = null,
   predictionRefreshTimer = null;
+let pendingAccessBonus = null,
+  accessBonusUiReady = false;
+const terminalEntryDurationMs = 1150;
 const labs = [
   {
     id: "card",
@@ -139,7 +143,7 @@ function labPage(training) {
         const records = list.filter(
           (r) => r.testId === l.id && r.testVersion === version,
         );
-        return `<section class="panel lab-row"><span class="test-icon" aria-hidden="true">${l.icon}</span><div><span class="eyebrow">LAB 0${i + 1} / ${l.sub}</span><h2>${l.name}</h2><p>${l.desc}</p><div class="lab-meta"><span>${l.time}</span><span>${l.sense}</span><span>${training ? `記録 ${records.length} 回` : done ? "✓ 本日完了" : "+10 RC"}</span></div>${training && records.length ? `<small class="muted">自己ベスト ${Math.max(local.get(`training-best:v${version}`, {})[l.id] || 0, ...records.map((r) => r.score ?? Number(r.correct)))} / 直近平均 ${(records.reduce((s, r) => s + (r.score ?? Number(r.correct)), 0) / records.length).toFixed(1)}<br>直近の記録：${new Intl.DateTimeFormat("ja-JP", { timeZone: config.timezone, month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit", second: "2-digit" }).format(Date.parse(records.at(-1).finishedAt))} JST / ${records.at(-1).score ?? Number(records.at(-1).correct)}</small>` : ""}</div>${button(training ? "訓練を始める　→" : done ? "結果を見る" : "試験を始める　→", `${training ? "training" : "daily"}-${l.id}`, done ? "secondary" : "primary")}</section>`;
+        return `<section class="panel lab-row"><span class="test-icon" aria-hidden="true">${l.icon}</span><div><span class="eyebrow">LAB 0${i + 1} / ${l.sub}</span><h2>${l.name}</h2><p>${l.desc}</p><div class="lab-meta"><span>${l.time}</span><span>${l.sense}</span><span>${training ? `記録 ${records.length} 回` : done ? "✓ 本日完了" : `+${config.economy.dailyTestRC[l.id]} RC`}</span></div>${training && records.length ? `<small class="muted">自己ベスト ${Math.max(local.get(`training-best:v${version}`, {})[l.id] || 0, ...records.map((r) => r.score ?? Number(r.correct)))} / 直近平均 ${(records.reduce((s, r) => s + (r.score ?? Number(r.correct)), 0) / records.length).toFixed(1)}<br>直近の記録：${new Intl.DateTimeFormat("ja-JP", { timeZone: config.timezone, month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit", second: "2-digit" }).format(Date.parse(records.at(-1).finishedAt))} JST / ${records.at(-1).score ?? Number(records.at(-1).correct)}</small>` : ""}</div>${button(training ? "訓練を始める　→" : done ? "結果を見る" : "試験を始める　→", `${training ? "training" : "daily"}-${l.id}`, done ? "secondary" : "primary")}</section>`;
       })
       .join("")}</div>`
   );
@@ -270,7 +274,7 @@ function battlePage() {
       )
       .join(
         "",
-      )}</div><div class="battle-stage"><div class="combatant"><img src="${c.image}" alt="${c.name}"><h3>${c.name}</h3><small class="muted">${config.labels[c.primarySense]} 適性 ${c.senseAffinity[c.primarySense]}</small></div><div class="vs">VS</div><div class="combatant enemy"><img src="${monsters[0].image}" alt="実験対象のモンスター"><h3>観測領域のモンスター</h3><small class="muted">3種の対象から選出</small></div></div><p class="small muted">勝利：10 RC・20 EXP / 敗北：5 EXP。開始時に回数を消費します。</p>${button(player?.pendingBattle ? "進行中の戦闘へ戻る" : "戦闘実験を開始　→", "battle-start")}</section><div class="future-strip"><span>WEEKEND RAID <small>週末共同レイド</small></span>${button("開発中", "coming", "secondary", 'aria-disabled="true"')}</div>`
+      )}</div><div class="battle-stage"><div class="combatant"><img src="${c.image}" alt="${c.name}"><h3>${c.name}</h3><small class="muted">${config.labels[c.primarySense]} 適性 ${c.senseAffinity[c.primarySense]}</small></div><div class="vs">VS</div><div class="combatant enemy"><img src="${monsters[0].image}" alt="実験対象のモンスター"><h3>観測領域のモンスター</h3><small class="muted">3種の対象から選出</small></div></div><p class="small muted">完了：${config.battle.completionRC} RC / 勝利：${config.battle.winEXP} EXP / 敗北：${config.battle.loseEXP} EXP。開始時に回数を消費します。</p>${button(player?.pendingBattle ? "進行中の戦闘へ戻る" : "戦闘実験を開始　→", "battle-start")}</section><div class="future-strip"><span>WEEKEND RAID <small>週末共同レイド</small></span>${button("開発中", "coming", "secondary", 'aria-disabled="true"')}</div>`
   );
 }
 async function runBattle() {
@@ -554,7 +558,7 @@ async function action(name) {
       );
       modal(
         "本日の試験は完了しました。",
-        `<p>${labs.find((l) => l.id === test).name}</p><p class="mint">獲得 ${Object.values(r?.xp || {}).reduce((a, b) => a + b, 0)} XP / 10 RC</p><p class="muted">次回は04:00 JSTから受験できます。</p>${button("訓練モードで遊ぶ", `training-${test}`)}`,
+        `<p>${labs.find((l) => l.id === test).name}</p><p class="mint">獲得 ${Object.values(r?.xp || {}).reduce((a, b) => a + b, 0)} XP / ${r?.rc ?? config.economy.dailyTestRC[test]} RC</p><p class="muted">次回は04:00 JSTから受験できます。</p>${button("訓練モードで遊ぶ", `training-${test}`)}`,
       );
       return;
     }
@@ -740,11 +744,34 @@ function applySettings() {
     local.get("contrast", false),
   );
 }
+function revealAccessBonus() {
+  if (!pendingAccessBonus) return;
+  const dialog = document.querySelector("#dialog");
+  if (dialog.open) {
+    dialog.addEventListener("close", revealAccessBonus, { once: true });
+    return;
+  }
+  const bonus = pendingAccessBonus;
+  pendingAccessBonus = null;
+  setTimeout(
+    () => showAccessBonus(bonus.amount),
+    Math.max(0, (bonus.showAfter ?? 0) - performance.now()),
+  );
+}
 async function connect() {
   try {
     const data = await api("/api/bootstrap");
     player = data.player;
     observedDay = data.dateJst;
+    if (data.accessBonus?.awarded) {
+      pendingAccessBonus = {
+        ...data.accessBonus,
+        showAfter: matchMedia("(prefers-reduced-motion: reduce)").matches
+          ? 0
+          : terminalEntryDurationMs,
+      };
+      if (accessBonusUiReady) revealAccessBonus();
+    }
     online = true;
   } catch {
     online = false;
@@ -789,6 +816,8 @@ applySettings();
 route = location.hash.slice(1) || "home";
 await connect();
 if (online && !local.get("welcomed", false)) welcome();
+accessBonusUiReady = true;
+revealAccessBonus();
 document.addEventListener("visibilitychange", () => {
   if (!document.hidden && !document.querySelector("#dialog").open && !busy)
     void connect();

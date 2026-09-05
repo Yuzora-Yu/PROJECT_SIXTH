@@ -34,7 +34,7 @@ test("starter, profile layers, baseline, name and three consolidated share cards
   await page.goto("/project_sixth/#home");
   await page.locator('#main [data-action="daily-card"]').click();
   await page.locator('[data-card="0"]').click();
-  await expect(page.locator("#card-result")).toContainText("+10 RC");
+  await expect(page.locator("#card-result")).toContainText("+20 RC");
   await page.keyboard.press("Escape");
   await page.goto("/project_sixth/#analyze");
   await page.locator("#subject-name").fill("夕空の観測者");

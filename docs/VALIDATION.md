@@ -2,14 +2,21 @@
 
 ## 自動検証
 
-- `npm test`: 34件成功。匿名セッション、同時更新、Daily、30秒粒子、戦闘、26名の公開対象、数秘・MBTI・惑星配置、初期値補正、共有、現実予測の公開期間・回答保存を確認。
+- `npm test`: 38件成功。匿名セッション、アクセスボーナスの日次境界と同時取得、Daily、30秒粒子、戦闘、旧報酬ルールで開始済みの戦闘、26名の公開対象、数秘・MBTI・惑星配置、初期値補正、共有、現実予測の公開期間・回答保存を確認。
 - `npm run test:predictions-import`: 10件成功。承認行の公開時刻境界、plan key許可リスト、公開済み状態の保持、結果確定時刻、タイムゾーンなしの時刻入力拒否を確認。
 - `npm run test:google-sheets-bridge`: 24件成功。live NOOP、前後snapshot、最大6件と延期、原子的なSheet確定、競合拒否、限定GET再試行、重複source_idの行番号診断を確認。
 - `npm run predictions:check`: release 2.2.0、公開対象12件で生成カタログが最新であることを確認。
 - `npm run build`: 成功。`dist/`を毎回消去してから公開素材だけを再生成し、運用xlsx・予測のWorker用カタログ・内部資料を含まないことを確認。
 - `npm run deploy:check`: Wrangler 4.129.0でWorkerと静的素材を検証。D1 `project-sixth` とASSETSの既存2 bindingだけを使用し、新規リソース作成なし。
-- `node scripts/economy-check.mjs`: 公開対象26名で戦闘を完走。Daily最大20 RC、戦闘最大50 RC、合計70 RC/日を維持。
+- `node scripts/economy-check.mjs`: 公開対象26名で勝敗を問わず戦闘完了時に10 RCを付与。カード20 RC、粒子30 RC、戦闘5回50 RCで活動報酬が合計100 RC/日、アクセスボーナスを含めた最大獲得量が200 RC/日になる設定を検証。
 - `git diff --check`: 空白エラーなし。
+
+## v0.4.2 本番確認
+
+- Worker version `eda8544d-1dce-4dc3-86ed-13ffc4797b7f` を2026-09-05 16:37:06 JSTに既存ルートへ配信。
+- `https://yu-zora.com/project_sixth/` がHTTP 200、末尾スラッシュなしが同URLへ308を返すことを確認。
+- 新規匿名セッションは初回アクセス時に300 RCから400 RCとなり、同じ日・同じCookieの再取得では400 RCのまま二重付与されないことを確認。
+- 390×844の本番画面で端末接続演出、アクセスボーナス通知、横あふれ0pxを確認。
 
 ## GitHub Actions実行確認
 

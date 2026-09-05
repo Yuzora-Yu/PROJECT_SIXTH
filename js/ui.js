@@ -41,6 +41,42 @@ export function toast(message) {
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => el.classList.remove("visible"), 4500);
 }
+let accessBonusTimer,
+  accessBonusValue = null,
+  accessBonusResumeDialog = null;
+function resumeAccessBonusAfter(dialog) {
+  if (accessBonusResumeDialog === dialog) return;
+  accessBonusResumeDialog = dialog;
+  dialog.addEventListener(
+    "close",
+    () => {
+      accessBonusResumeDialog = null;
+      if (accessBonusValue) showAccessBonus(accessBonusValue);
+    },
+    { once: true },
+  );
+}
+export function showAccessBonus(amount) {
+  const value = Number(amount);
+  if (!Number.isSafeInteger(value) || value <= 0) return;
+  const el = document.querySelector("#access-bonus");
+  if (!el) return;
+  accessBonusValue = value;
+  const dialog = document.querySelector("#dialog");
+  if (dialog?.open) {
+    resumeAccessBonusAfter(dialog);
+    return;
+  }
+  el.innerHTML = `<span>DAILY ACCESS</span><strong>研究所アクセスボーナス</strong><b>+${value.toLocaleString("ja-JP")} RC</b>`;
+  el.classList.remove("visible");
+  void el.offsetWidth;
+  el.classList.add("visible");
+  clearTimeout(accessBonusTimer);
+  accessBonusTimer = setTimeout(() => {
+    el.classList.remove("visible");
+    accessBonusValue = null;
+  }, 5500);
+}
 let cleanup = null;
 export const setCleanup = (fn) => {
   cleanup = fn;
@@ -56,6 +92,12 @@ export function modal(title, html, tag = "PROJECT SIXTH") {
   cleanup = null;
   fn?.();
   const el = document.querySelector("#dialog");
+  const bonus = document.querySelector("#access-bonus");
+  if (accessBonusValue && bonus?.classList.contains("visible")) {
+    bonus.classList.remove("visible");
+    clearTimeout(accessBonusTimer);
+    resumeAccessBonusAfter(el);
+  }
   document.querySelector("#dialog-tag").textContent = tag;
   document.querySelector("#dialog-content").innerHTML =
     `<h2 id="dialog-title">${title}</h2>${html}`;
