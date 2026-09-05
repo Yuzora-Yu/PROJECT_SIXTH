@@ -131,6 +131,7 @@ jobs:
           PY
 
       - name: Export the canonical Sheet
+        if: steps.plan.outputs.count != '0'
         env:
           GEMINI_SPARK_BRIDGE_URL: ${{ vars.GEMINI_SPARK_BRIDGE_URL }}
           GEMINI_SPARK_BRIDGE_SECRET: ${{ secrets.GEMINI_SPARK_BRIDGE_SECRET }}
@@ -152,7 +153,7 @@ jobs:
           --output "$RUNNER_TEMP/publication-plan.json"
           > /dev/null
 
-      - name: Verify the Sheet did not change during export
+      - name: Verify the live publication snapshot is stable
         env:
           INITIAL_PLAN_PATH: ${{ runner.temp }}/initial-plan.json
           PUBLICATION_PLAN_PATH: ${{ runner.temp }}/publication-plan.json
@@ -170,19 +171,21 @@ jobs:
           )
           for field in ("snapshot_fingerprint", "items", "counts"):
               if initial.get(field) != publication.get(field):
-                  raise SystemExit("live publication state changed during Sheet export")
+                  raise SystemExit("live publication state changed during the validation window")
           if initial.get("as_of_jst") != publication.get("as_of_jst"):
               raise SystemExit("publication plans use different as_of_jst values")
           print("live publication snapshots match")
           PY
 
       - name: Generate and check the public catalog
+        if: steps.plan.outputs.count != '0'
         run: |
           cp worker/prediction-catalog.generated.js "$RUNNER_TEMP/prediction-catalog.before.js"
           python scripts/import-predictions.py "$RUNNER_TEMP/prediction-ops.xlsx" --as-of "${{ steps.plan.outputs.as_of_jst }}" --approved-keys-file "$RUNNER_TEMP/publication-plan.json"
           python scripts/import-predictions.py "$RUNNER_TEMP/prediction-ops.xlsx" --as-of "${{ steps.plan.outputs.as_of_jst }}" --approved-keys-file "$RUNNER_TEMP/publication-plan.json" --check
 
       - name: Reject catalog changes outside the publication plan
+        if: steps.plan.outputs.count != '0'
         env:
           BEFORE_CATALOG_PATH: ${{ runner.temp }}/prediction-catalog.before.js
           AFTER_CATALOG_PATH: worker/prediction-catalog.generated.js

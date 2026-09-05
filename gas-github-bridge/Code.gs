@@ -1,5 +1,5 @@
 /**
- * PROJECT SIXTH - owner-only Gemini Spark Sheet bridge v1.0.0
+ * PROJECT SIXTH - owner-only Gemini Spark Sheet bridge v1.1.0
  *
  * Deploy this as a SEPARATE Apps Script Web App:
  * - Execute as: Me (the spreadsheet owner)
@@ -20,7 +20,10 @@ var BRIDGE_CONFIG = Object.freeze({
   MAX_CLOCK_SKEW_SECONDS: 300,
   NONCE_TTL_SECONDS: 600,
   MAX_PUBLICATIONS_PER_COMMIT: 6,
-  SECRET_PROPERTY: 'GITHUB_BRIDGE_SECRET'
+  SECRET_PROPERTY: 'GITHUB_BRIDGE_SECRET',
+  EXPORT_CHUNK_CHARS: 90000,
+  EXPORT_CACHE_TTL_SECONDS: 600,
+  MAX_EXPORT_CHUNKS: 900
 });
 
 var ALLOWED_READ_RANGES = Object.freeze([
@@ -175,8 +178,21 @@ function authenticateRequest_(e) {
 function dispatchOperation_(operation, payload) {
   validateSpreadsheetId_(payload.spreadsheet_id);
   if (operation === 'export_xlsx') {
+    // Backward-compatible single-response export for older clients.
     assertExactKeys_(payload, ['spreadsheet_id']);
     return exportXlsx_();
+  }
+  if (operation === 'export_xlsx_begin') {
+    assertExactKeys_(payload, ['spreadsheet_id']);
+    return exportXlsxBegin_();
+  }
+  if (operation === 'export_xlsx_chunk') {
+    assertExactKeys_(payload, ['chunk_index', 'export_id', 'spreadsheet_id']);
+    return exportXlsxChunk_(payload.export_id, payload.chunk_index);
+  }
+  if (operation === 'export_xlsx_finish') {
+    assertExactKeys_(payload, ['chunk_count', 'export_id', 'spreadsheet_id']);
+    return exportXlsxFinish_(payload.export_id, payload.chunk_count);
   }
   if (operation === 'get_spreadsheet_metadata') {
     assertExactKeys_(payload, ['spreadsheet_id']);
@@ -209,6 +225,95 @@ function exportXlsx_() {
       Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, bytes)
     )
   };
+}
+
+function exportCacheMetaKey_(exportId) {
+  return 'xlsx_meta_' + exportId;
+}
+
+function exportCacheChunkKey_(exportId, chunkIndex) {
+  return 'xlsx_' + exportId + '_' + chunkIndex;
+}
+
+function validateExportId_(exportId) {
+  if (typeof exportId !== 'string' || !/^[0-9a-f]{32}$/.test(exportId)) {
+    throw new Error('export_id is invalid');
+  }
+}
+
+function exportXlsxBegin_() {
+  var encodedId = encodeURIComponent(BRIDGE_CONFIG.TARGET_SPREADSHEET_ID);
+  var url =
+    'https://www.googleapis.com/drive/v3/files/' +
+    encodedId +
+    '/export?mimeType=' +
+    encodeURIComponent(BRIDGE_CONFIG.XLSX_MIME);
+  var response = fetchGoogle_(url, {method: 'get'}, 'Drive export');
+  var bytes = response.getContent();
+  var encoded = Utilities.base64Encode(bytes);
+  var chunkCount = Math.ceil(encoded.length / BRIDGE_CONFIG.EXPORT_CHUNK_CHARS);
+  if (chunkCount < 1 || chunkCount > BRIDGE_CONFIG.MAX_EXPORT_CHUNKS) {
+    throw new Error('XLSX export exceeds the chunked bridge limit');
+  }
+  var exportId = Utilities.getUuid().replace(/-/g, '').toLowerCase();
+  var cache = CacheService.getScriptCache();
+  var cacheValues = {};
+  for (var index = 0; index < chunkCount; index += 1) {
+    cacheValues[exportCacheChunkKey_(exportId, index)] = encoded.slice(
+      index * BRIDGE_CONFIG.EXPORT_CHUNK_CHARS,
+      (index + 1) * BRIDGE_CONFIG.EXPORT_CHUNK_CHARS
+    );
+  }
+  var metadata = {
+    export_id: exportId,
+    chunk_count: chunkCount,
+    byte_length: bytes.length,
+    content_type: normalizedContentType_(response),
+    sha256: bytesToHex_(
+      Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, bytes)
+    )
+  };
+  cacheValues[exportCacheMetaKey_(exportId)] = JSON.stringify(metadata);
+  cache.putAll(cacheValues, BRIDGE_CONFIG.EXPORT_CACHE_TTL_SECONDS);
+  return metadata;
+}
+
+function exportXlsxChunk_(exportId, chunkIndex) {
+  validateExportId_(exportId);
+  if (!isInteger_(chunkIndex) || chunkIndex < 0 || chunkIndex >= BRIDGE_CONFIG.MAX_EXPORT_CHUNKS) {
+    throw new Error('chunk_index is invalid');
+  }
+  var cache = CacheService.getScriptCache();
+  var metadataText = cache.get(exportCacheMetaKey_(exportId));
+  if (metadataText === null) {
+    throw new Error('export cache expired; restart export');
+  }
+  var metadata = JSON.parse(metadataText);
+  if (chunkIndex >= metadata.chunk_count) {
+    throw new Error('chunk_index exceeds the export manifest');
+  }
+  var encoded = cache.get(exportCacheChunkKey_(exportId, chunkIndex));
+  if (encoded === null) {
+    throw new Error('export cache chunk expired; restart export');
+  }
+  return {
+    export_id: exportId,
+    chunk_index: chunkIndex,
+    data_base64: encoded
+  };
+}
+
+function exportXlsxFinish_(exportId, chunkCount) {
+  validateExportId_(exportId);
+  if (!isInteger_(chunkCount) || chunkCount < 0 || chunkCount > BRIDGE_CONFIG.MAX_EXPORT_CHUNKS) {
+    throw new Error('chunk_count is invalid');
+  }
+  var keys = [exportCacheMetaKey_(exportId)];
+  for (var index = 0; index < chunkCount; index += 1) {
+    keys.push(exportCacheChunkKey_(exportId, index));
+  }
+  CacheService.getScriptCache().removeAll(keys);
+  return {export_id: exportId, removed: true};
 }
 
 function getSpreadsheetMetadata_() {

@@ -689,7 +689,9 @@ class AppsScriptBridgeApiTests(unittest.TestCase):
 
     @staticmethod
     def client(*, delays=None, nonces=None):
-        nonce_values = iter(nonces or ["1" * 32, "2" * 32, "3" * 32])
+        nonce_values = iter(
+            nonces or [f"{value:032x}" for value in range(1, 100)]
+        )
         return BRIDGE.AppsScriptBridgeApi(
             BRIDGE_URL,
             BRIDGE_SECRET,
@@ -710,7 +712,7 @@ class AppsScriptBridgeApiTests(unittest.TestCase):
         envelope = json.loads(request.data.decode("utf-8"))
         self.assertEqual(envelope["version"], BRIDGE.BRIDGE_PROTOCOL_VERSION)
         self.assertEqual(envelope["timestamp"], 1_788_600_000)
-        self.assertEqual(envelope["nonce"], "1" * 32)
+        self.assertEqual(envelope["nonce"], "0" * 31 + "1")
         self.assertEqual(envelope["operation"], "get_spreadsheet_metadata")
         self.assertEqual(
             envelope["payload"],
@@ -732,25 +734,79 @@ class AppsScriptBridgeApiTests(unittest.TestCase):
         ).hexdigest()
         self.assertEqual(envelope["signature"], expected)
 
-    def test_export_decodes_xlsx_and_checks_checksum(self):
+    def test_export_decodes_chunked_xlsx_and_checks_checksum(self):
         data = xlsx_bytes()
-        response = self.Response(
-            {
-                "ok": True,
-                "result": {
-                    "content_type": BRIDGE.XLSX_MIME,
-                    "data_base64": base64.b64encode(data).decode("ascii"),
-                    "sha256": hashlib.sha256(data).hexdigest(),
-                },
-            }
-        )
+        encoded = base64.b64encode(data).decode("ascii")
+        midpoint = max(1, len(encoded) // 2)
+        export_id = "a" * 32
+        responses = [
+            self.Response(
+                {
+                    "ok": True,
+                    "result": {
+                        "export_id": export_id,
+                        "content_type": BRIDGE.XLSX_MIME,
+                        "sha256": hashlib.sha256(data).hexdigest(),
+                        "byte_length": len(data),
+                        "chunk_count": 2,
+                    },
+                }
+            ),
+            self.Response(
+                {
+                    "ok": True,
+                    "result": {
+                        "export_id": export_id,
+                        "chunk_index": 0,
+                        "data_base64": encoded[:midpoint],
+                    },
+                }
+            ),
+            self.Response(
+                {
+                    "ok": True,
+                    "result": {
+                        "export_id": export_id,
+                        "chunk_index": 1,
+                        "data_base64": encoded[midpoint:],
+                    },
+                }
+            ),
+            self.Response(
+                {"ok": True, "result": {"export_id": export_id, "removed": True}}
+            ),
+        ]
         with mock.patch.object(
-            BRIDGE.urllib.request, "urlopen", return_value=response
-        ):
+            BRIDGE.urllib.request, "urlopen", side_effect=responses
+        ) as urlopen:
             result = self.client().export_xlsx(BRIDGE.SPREADSHEET_ID)
 
         self.assertEqual(result.data, data)
         self.assertEqual(result.content_type, BRIDGE.XLSX_MIME)
+        operations = [
+            json.loads(call.args[0].data.decode("utf-8"))["operation"]
+            for call in urlopen.call_args_list
+        ]
+        self.assertEqual(
+            operations,
+            [
+                "export_xlsx_begin",
+                "export_xlsx_chunk",
+                "export_xlsx_chunk",
+                "export_xlsx_finish",
+            ],
+        )
+
+    def test_non_json_bridge_error_reports_content_type_and_html_title(self):
+        response = self.Response({}, content_type="text/html; charset=utf-8")
+        response.data = b"<html><head><title>Google Drive export error</title></head></html>"
+        with mock.patch.object(
+            BRIDGE.urllib.request, "urlopen", return_value=response
+        ):
+            with self.assertRaisesRegex(
+                BRIDGE.BridgeError, r"content-type=text/html.*Google Drive export error"
+            ):
+                self.client().get_spreadsheet_metadata(BRIDGE.SPREADSHEET_ID)
 
     def test_safe_read_retries_retryable_bridge_error(self):
         delays = []
@@ -817,6 +873,8 @@ class OwnerOnlyRepositoryBoundaryTests(unittest.TestCase):
                 self.assertNotIn(value, workflow)
         self.assertIn("GEMINI_SPARK_BRIDGE_URL", workflow)
         self.assertIn("GEMINI_SPARK_BRIDGE_SECRET", workflow)
+        self.assertIn("Export the canonical Sheet\n        if: steps.plan.outputs.count != '0'", workflow)
+        self.assertIn("Generate and check the public catalog\n        if: steps.plan.outputs.count != '0'", workflow)
 
     def test_apps_script_bridge_is_fixed_to_the_production_sheet_contract(self):
         code = (ROOT / "gas-github-bridge/Code.gs").read_text(encoding="utf-8")
@@ -830,6 +888,9 @@ class OwnerOnlyRepositoryBoundaryTests(unittest.TestCase):
             self.assertIn(value_range, code)
         self.assertIn("MAX_PUBLICATIONS_PER_COMMIT: 6", code)
         self.assertIn("function validatePublicationRequests_", code)
+        self.assertIn("EXPORT_CHUNK_CHARS: 90000", code)
+        self.assertIn("function exportXlsxBegin_", code)
+        self.assertIn("function exportXlsxChunk_", code)
 
 
 if __name__ == "__main__":

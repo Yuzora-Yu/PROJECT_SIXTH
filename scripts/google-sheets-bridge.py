@@ -48,6 +48,7 @@ XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 MIN_XLSX_BYTES = 128
 MAX_XLSX_BYTES = 50 * 1024 * 1024
 MAX_UNCOMPRESSED_XLSX_BYTES = 200 * 1024 * 1024
+MAX_EXPORT_CHUNKS = 900
 
 REQUIRED_TABS = (
     "00_DASHBOARD",
@@ -327,7 +328,19 @@ class AppsScriptBridgeApi:
             if len(data) > 25 * 1024 * 1024:
                 raise BridgeError("Apps Script bridge response exceeded size limit")
             if content_type.split(";", 1)[0].strip().lower() != "application/json":
-                raise BridgeError("Apps Script bridge returned a non-JSON response")
+                preview = data[:1024].decode("utf-8", errors="replace")
+                title_match = re.search(
+                    r"<title[^>]*>(.*?)</title>", preview, flags=re.IGNORECASE | re.DOTALL
+                )
+                title = ""
+                if title_match:
+                    title = re.sub(r"\s+", " ", title_match.group(1)).strip()[:160]
+                detail = f"content-type={content_type or 'missing'}"
+                if title:
+                    detail += f", title={title!r}"
+                raise BridgeError(
+                    "Apps Script bridge returned a non-JSON response (" + detail + ")"
+                )
             try:
                 envelope = json.loads(data.decode("utf-8"))
             except (UnicodeDecodeError, json.JSONDecodeError):
@@ -349,27 +362,87 @@ class AppsScriptBridgeApi:
         raise BridgeError("Apps Script bridge retry budget was exhausted")
 
     def export_xlsx(self, spreadsheet_id: str) -> BinaryResponse:
-        result = self._request(
-            "export_xlsx",
-            {"spreadsheet_id": spreadsheet_id},
-            retry_safe=True,
-        )
-        encoded = result.get("data_base64")
-        content_type = result.get("content_type")
-        expected_sha256 = result.get("sha256")
-        if not isinstance(encoded, str) or not isinstance(content_type, str):
-            raise BridgeError("Apps Script bridge returned an invalid XLSX export")
-        try:
-            data = base64.b64decode(encoded, validate=True)
-        except (ValueError, binascii.Error):
-            raise BridgeError("Apps Script bridge returned invalid base64 XLSX data") from None
-        if (
-            not isinstance(expected_sha256, str)
-            or not TOKEN_RE.fullmatch(expected_sha256)
-            or not hmac.compare_digest(hashlib.sha256(data).hexdigest(), expected_sha256)
-        ):
-            raise BridgeError("Apps Script bridge XLSX checksum did not match")
-        return BinaryResponse(data=data, content_type=content_type)
+        last_error: BridgeError | None = None
+        for session_attempt in range(2):
+            export_id = None
+            chunk_count = 0
+            try:
+                begin = self._request(
+                    "export_xlsx_begin",
+                    {"spreadsheet_id": spreadsheet_id},
+                    retry_safe=True,
+                )
+                export_id = begin.get("export_id")
+                content_type = begin.get("content_type")
+                expected_sha256 = begin.get("sha256")
+                byte_length = begin.get("byte_length")
+                chunk_count = begin.get("chunk_count")
+                if (
+                    not isinstance(export_id, str)
+                    or not re.fullmatch(r"[0-9a-f]{32}", export_id)
+                    or not isinstance(content_type, str)
+                    or not isinstance(expected_sha256, str)
+                    or not TOKEN_RE.fullmatch(expected_sha256)
+                    or not isinstance(byte_length, int)
+                    or isinstance(byte_length, bool)
+                    or byte_length < MIN_XLSX_BYTES
+                    or byte_length > MAX_XLSX_BYTES
+                    or not isinstance(chunk_count, int)
+                    or isinstance(chunk_count, bool)
+                    or chunk_count < 1
+                    or chunk_count > MAX_EXPORT_CHUNKS
+                ):
+                    raise BridgeError("Apps Script bridge returned an invalid XLSX export manifest")
+
+                encoded_parts: list[str] = []
+                for chunk_index in range(chunk_count):
+                    chunk = self._request(
+                        "export_xlsx_chunk",
+                        {
+                            "spreadsheet_id": spreadsheet_id,
+                            "export_id": export_id,
+                            "chunk_index": chunk_index,
+                        },
+                        retry_safe=True,
+                    )
+                    if chunk.get("export_id") != export_id or chunk.get("chunk_index") != chunk_index:
+                        raise BridgeError("Apps Script bridge returned the wrong XLSX chunk")
+                    encoded = chunk.get("data_base64")
+                    if not isinstance(encoded, str) or not encoded:
+                        raise BridgeError("Apps Script bridge returned an invalid XLSX chunk")
+                    encoded_parts.append(encoded)
+
+                try:
+                    data = base64.b64decode("".join(encoded_parts), validate=True)
+                except (ValueError, binascii.Error):
+                    raise BridgeError("Apps Script bridge returned invalid base64 XLSX data") from None
+                if len(data) != byte_length:
+                    raise BridgeError("Apps Script bridge XLSX byte length did not match")
+                if not hmac.compare_digest(
+                    hashlib.sha256(data).hexdigest(), expected_sha256
+                ):
+                    raise BridgeError("Apps Script bridge XLSX checksum did not match")
+                return BinaryResponse(data=data, content_type=content_type)
+            except BridgeError as error:
+                last_error = error
+                if session_attempt == 0 and "export cache" in str(error).lower():
+                    continue
+                raise
+            finally:
+                if export_id is not None:
+                    try:
+                        self._request(
+                            "export_xlsx_finish",
+                            {
+                                "spreadsheet_id": spreadsheet_id,
+                                "export_id": export_id,
+                                "chunk_count": chunk_count,
+                            },
+                            retry_safe=False,
+                        )
+                    except BridgeError:
+                        pass
+        raise last_error or BridgeError("Apps Script bridge XLSX export failed")
 
     def get_spreadsheet_metadata(self, spreadsheet_id: str) -> dict[str, Any]:
         return self._request(
