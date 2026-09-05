@@ -249,5 +249,24 @@ export const rawPredictionCatalog = Object.freeze([
       "name": "Billboard JAPAN Charts",
       "url": "https://www.billboard-japan.com/charts/"
     }
+  },
+  {
+    "id": "PRED-20260905-018",
+    "version": 1,
+    "category": "ECONOMY",
+    "horizon": "MEDIUM",
+    "question": "財務省が2026年9月に公表する2026年8月分貿易統計（速報）において、日本の貿易収支は黒字となるか？",
+    "choices": [
+      "黒字（差引額がプラス）",
+      "赤字（差引額がマイナス、または0円）"
+    ],
+    "resolutionRule": "財務省貿易統計にて2026年9月16日に公表される「令和8年（2026年）8月分貿易統計（速報）の概要」における「差引額（貿易収支）」の公表値に基づき判定する。差引額がプラス（黒字）であれば「黒字（差引額がプラス）」、マイナス（赤字、△表記）または0円であれば「赤字（差引額がマイナス、または0円）」とする。公表が延期・中止された場合は判定保留。後日の確報値等ではなく、速報公表時点の数値を基準とする。",
+    "publishAt": "2026-09-05T20:00:00+09:00",
+    "closeAt": "2026-09-15T23:59:00+09:00",
+    "resultDueAt": "2026-09-16T09:30:00+09:00",
+    "source": {
+      "name": "財務省貿易統計",
+      "url": "https://www.customs.go.jp/toukei/info/"
+    }
   }
 ]);
