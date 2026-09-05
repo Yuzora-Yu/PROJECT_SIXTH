@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import copy
+import base64
+import hmac
 import hashlib
 import importlib.util
 import io
@@ -10,7 +12,6 @@ import tempfile
 import unittest
 import urllib.error
 import zipfile
-from email.message import Message
 from datetime import datetime
 from pathlib import Path
 from unittest import mock
@@ -27,6 +28,8 @@ SPEC.loader.exec_module(BRIDGE)
 FIXED_NOW = datetime.fromisoformat("2026-09-05T15:00:00+09:00")
 COMMIT_TIME = datetime.fromisoformat("2026-09-05T15:05:00+09:00")
 COMMIT_URL = "https://github.com/Yuzora-Yu/PROJECT_SIXTH/commit/abcdef123456"
+BRIDGE_URL = "https://script.google.com/macros/s/AKfycb-test_deployment/exec"
+BRIDGE_SECRET = "a" * 64
 
 
 def config_rows():
@@ -257,7 +260,11 @@ class FakeApi:
 class PlanTests(unittest.TestCase):
     def test_plan_cli_as_of_requires_explicit_timezone(self):
         with mock.patch.dict(
-            BRIDGE.os.environ, {"GHA_GOOGLE_ACCESS_TOKEN": "access-token"}
+            BRIDGE.os.environ,
+            {
+                "GEMINI_SPARK_BRIDGE_URL": BRIDGE_URL,
+                "GEMINI_SPARK_BRIDGE_SECRET": BRIDGE_SECRET,
+            },
         ):
             with self.assertRaisesRegex(BRIDGE.BridgeError, "timezone"):
                 BRIDGE.run(["plan", "--as-of", "2026-09-05T15:00:00"])
@@ -665,10 +672,10 @@ class ExportTests(unittest.TestCase):
                     self.assertFalse(path.exists())
 
 
-class GoogleRestApiRetryTests(unittest.TestCase):
+class AppsScriptBridgeApiTests(unittest.TestCase):
     class Response:
-        def __init__(self, data: bytes, content_type: str):
-            self.data = data
+        def __init__(self, value, content_type="application/json"):
+            self.data = json.dumps(value, ensure_ascii=False).encode("utf-8")
             self.headers = {"Content-Type": content_type}
 
         def __enter__(self):
@@ -681,48 +688,84 @@ class GoogleRestApiRetryTests(unittest.TestCase):
             return self.data[:amount]
 
     @staticmethod
-    def http_error(code: int, retry_after: str | None = None):
-        headers = Message()
-        if retry_after is not None:
-            headers["Retry-After"] = retry_after
-        return urllib.error.HTTPError(
-            "https://example.invalid", code, "temporary", headers, None
+    def client(*, delays=None, nonces=None):
+        nonce_values = iter(nonces or ["1" * 32, "2" * 32, "3" * 32])
+        return BRIDGE.AppsScriptBridgeApi(
+            BRIDGE_URL,
+            BRIDGE_SECRET,
+            sleep=(delays.append if delays is not None else lambda _: None),
+            clock=lambda: 1_788_600_000,
+            nonce_factory=lambda: next(nonce_values),
         )
 
-    def test_drive_export_get_retries_429_and_caps_retry_after(self):
-        delays = []
-        response = self.Response(b"xlsx", BRIDGE.XLSX_MIME)
+    def test_request_is_hmac_signed_and_payload_is_canonical(self):
+        response = self.Response({"ok": True, "result": metadata()})
         with mock.patch.object(
-            BRIDGE.urllib.request,
-            "urlopen",
-            side_effect=[self.http_error(429, "99"), response],
+            BRIDGE.urllib.request, "urlopen", return_value=response
         ) as urlopen:
-            result = BRIDGE.GoogleRestApi(
-                "access-token", sleep=delays.append
-            ).export_xlsx(BRIDGE.SPREADSHEET_ID)
+            result = self.client().get_spreadsheet_metadata(BRIDGE.SPREADSHEET_ID)
 
-        self.assertEqual(result.data, b"xlsx")
-        self.assertEqual(delays, [BRIDGE.MAX_RETRY_DELAY_SECONDS])
-        self.assertEqual(urlopen.call_count, 2)
+        self.assertEqual(result["spreadsheetId"], BRIDGE.SPREADSHEET_ID)
+        request = urlopen.call_args.args[0]
+        envelope = json.loads(request.data.decode("utf-8"))
+        self.assertEqual(envelope["version"], BRIDGE.BRIDGE_PROTOCOL_VERSION)
+        self.assertEqual(envelope["timestamp"], 1_788_600_000)
+        self.assertEqual(envelope["nonce"], "1" * 32)
+        self.assertEqual(envelope["operation"], "get_spreadsheet_metadata")
+        self.assertEqual(
+            envelope["payload"],
+            json.dumps(
+                {"spreadsheet_id": BRIDGE.SPREADSHEET_ID},
+                ensure_ascii=False,
+                sort_keys=True,
+                separators=(",", ":"),
+            ),
+        )
+        message = (
+            f'{envelope["version"]}\n{envelope["timestamp"]}\n'
+            f'{envelope["nonce"]}\n{envelope["operation"]}\n{envelope["payload"]}'
+        )
+        expected = hmac.new(
+            BRIDGE_SECRET.encode("utf-8"),
+            message.encode("utf-8"),
+            hashlib.sha256,
+        ).hexdigest()
+        self.assertEqual(envelope["signature"], expected)
 
-    def test_sheets_read_get_retries_5xx_with_short_backoff(self):
-        delays = []
-        payload = json.dumps(
+    def test_export_decodes_xlsx_and_checks_checksum(self):
+        data = xlsx_bytes()
+        response = self.Response(
             {
-                "spreadsheetId": BRIDGE.SPREADSHEET_ID,
-                "properties": {"timeZone": BRIDGE.TIMEZONE_NAME},
-                "sheets": [],
+                "ok": True,
+                "result": {
+                    "content_type": BRIDGE.XLSX_MIME,
+                    "data_base64": base64.b64encode(data).decode("ascii"),
+                    "sha256": hashlib.sha256(data).hexdigest(),
+                },
             }
-        ).encode("utf-8")
-        response = self.Response(payload, "application/json")
+        )
+        with mock.patch.object(
+            BRIDGE.urllib.request, "urlopen", return_value=response
+        ):
+            result = self.client().export_xlsx(BRIDGE.SPREADSHEET_ID)
+
+        self.assertEqual(result.data, data)
+        self.assertEqual(result.content_type, BRIDGE.XLSX_MIME)
+
+    def test_safe_read_retries_retryable_bridge_error(self):
+        delays = []
+        retryable = self.Response(
+            {"ok": False, "retryable": True, "message": "temporary upstream failure"}
+        )
+        success = self.Response({"ok": True, "result": metadata()})
         with mock.patch.object(
             BRIDGE.urllib.request,
             "urlopen",
-            side_effect=[self.http_error(503), response],
+            side_effect=[retryable, success],
         ) as urlopen:
-            result = BRIDGE.GoogleRestApi(
-                "access-token", sleep=delays.append
-            ).get_spreadsheet_metadata(BRIDGE.SPREADSHEET_ID)
+            result = self.client(delays=delays).get_spreadsheet_metadata(
+                BRIDGE.SPREADSHEET_ID
+            )
 
         self.assertEqual(result["spreadsheetId"], BRIDGE.SPREADSHEET_ID)
         self.assertEqual(delays, [0.25])
@@ -730,18 +773,63 @@ class GoogleRestApiRetryTests(unittest.TestCase):
 
     def test_atomic_post_is_never_retried_after_unknown_http_failure(self):
         delays = []
+        error = urllib.error.HTTPError(
+            BRIDGE_URL, 503, "temporary", {}, None
+        )
         with mock.patch.object(
-            BRIDGE.urllib.request,
-            "urlopen",
-            side_effect=self.http_error(503, "1"),
+            BRIDGE.urllib.request, "urlopen", side_effect=error
         ) as urlopen:
             with self.assertRaisesRegex(BRIDGE.BridgeError, "HTTP 503"):
-                BRIDGE.GoogleRestApi(
-                    "access-token", sleep=delays.append
-                ).batch_update(BRIDGE.SPREADSHEET_ID, [])
+                self.client(delays=delays).batch_update(BRIDGE.SPREADSHEET_ID, [])
 
         self.assertEqual(delays, [])
         self.assertEqual(urlopen.call_count, 1)
+
+    def test_rejects_non_google_or_dev_bridge_urls(self):
+        for url in (
+            "https://example.com/bridge",
+            "https://script.google.com/macros/s/AKfycb-test/dev",
+            "http://script.google.com/macros/s/AKfycb-test/exec",
+        ):
+            with self.subTest(url=url):
+                with self.assertRaisesRegex(BRIDGE.BridgeError, "production"):
+                    BRIDGE.AppsScriptBridgeApi(url, BRIDGE_SECRET)
+
+    def test_rejects_malformed_secret(self):
+        with self.assertRaisesRegex(BRIDGE.BridgeError, "secret"):
+            BRIDGE.AppsScriptBridgeApi(BRIDGE_URL, "too-short")
+
+
+class OwnerOnlyRepositoryBoundaryTests(unittest.TestCase):
+    def test_workflow_has_no_google_identity_or_direct_google_token(self):
+        workflow = (ROOT / ".github/workflows/publish-predictions.yml").read_text(
+            encoding="utf-8"
+        )
+        forbidden = (
+            "id-token: write",
+            "google-github-actions/auth",
+            "GCP_WIF_PROVIDER",
+            "GCP_SERVICE_ACCOUNT",
+            "GHA_GOOGLE_ACCESS_TOKEN",
+        )
+        for value in forbidden:
+            with self.subTest(value=value):
+                self.assertNotIn(value, workflow)
+        self.assertIn("GEMINI_SPARK_BRIDGE_URL", workflow)
+        self.assertIn("GEMINI_SPARK_BRIDGE_SECRET", workflow)
+
+    def test_apps_script_bridge_is_fixed_to_the_production_sheet_contract(self):
+        code = (ROOT / "gas-github-bridge/Code.gs").read_text(encoding="utf-8")
+        self.assertIn(BRIDGE.SPREADSHEET_ID, code)
+        for value_range in (
+            BRIDGE.CONFIG_RANGE,
+            BRIDGE.PREDICTIONS_RANGE,
+            BRIDGE.SOURCE_RANGE,
+            BRIDGE.AUDIT_RANGE,
+        ):
+            self.assertIn(value_range, code)
+        self.assertIn("MAX_PUBLICATIONS_PER_COMMIT: 6", code)
+        self.assertIn("function validatePublicationRequests_", code)
 
 
 if __name__ == "__main__":

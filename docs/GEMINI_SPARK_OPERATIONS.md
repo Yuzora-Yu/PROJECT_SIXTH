@@ -1,6 +1,6 @@
 # Gemini Spark 運用仕様 — Reality Prediction Ops
 
-確認日: 2026-09-04  
+確認日: 2026-09-05
 対象: PROJECT SIXTH 現実予測運用 / release 2.1.0 / schema 2.0.0
 
 ## 1. この文書の目的
@@ -23,7 +23,7 @@ Gemini Spark をバックオフィスの運用エージェントとして使い�
 - 使用量制限の影響で予定実行がスキップされる可能性がある。
 - 同時実行上限は最大 15 task。上限到達時は予定 task が走らない場合がある。
 - Google Sheets の作成・編集、表・データ・数式の操作が可能。
-- 共有 Sheet の編集では planned edits のレビュー/確認が必要になる場合がある。無人実行用 Sheet の共有方式は本番前に PoC する。
+- 共有 Sheet の編集では planned edits のレビュー/確認が必要になる場合がある。本番のSpark運用Sheetは**所有者以外へ共有しない**。CI/サービスアカウントも共同編集者へ追加しない。
 - Skill は単一ジョブ向けの短い quick reference とし、手順、出力形式、よくある誤り、不足情報時の扱いを明示する。
 - Skill 名は小文字 + ハイフンで、動作を表す名前にする。
 - Skill は `SKILL.md` 単体、またはルートに `SKILL.md` を持つ ZIP として登録可能。
@@ -148,7 +148,7 @@ Google Drive へアップロードし Google Sheets へ変換して使用する�
 
 ## 6. GitHub Actions との境界
 
-Action 1はGoogle OIDCと専用サービスアカウントを使うSheet bridgeとして実装済み。Action 2は報酬仕様が確定するまで実装しない。設定と初回確認は `PREDICTION_AUTOMATION.md` を正とする。
+Action 1は、Sheet所有者として実行する専用Apps Script Web Appを経由するbridgeとして実装する。GitHub Actions自体にはGoogleアカウント権限を与えず、固定Sheetの共有メンバーにも追加しない。Action 2は報酬仕様が確定するまで実装しない。設定と初回確認は `PREDICTION_AUTOMATION.md` を正とする。
 
 ### Action 1
 
@@ -181,17 +181,17 @@ Action 1はGoogle OIDCと専用サービスアカウントを使うSheet bridge�
 
 ## 7. Sheet bridge の確認結果
 
-個人所有Sheetを専用サービスアカウントへ共有し、GitHub OIDCから短時間だけ借用する方式を採用した。JSON鍵、個人OAuth refresh token、OAuth client secretは使用しない。
+個人所有Sheetは所有者のみの非共有状態を維持する。GitHub ActionsはHMAC署名したHTTPS POSTで専用Apps Script Web Appを呼び、Web Appがデプロイ所有者の権限で固定Sheetへアクセスする。Apps ScriptのGoogle OAuth tokenはGitHubへ渡さず、サービスアカウント、JSON鍵、個人OAuth refresh token、OAuth client secretも使用しない。
 
 Action 1は次を検証する:
 
-1. GitHub Actionsから固定Sheetだけを読み書きできること
+1. GitHub Actionsが固定Sheetの共有メンバーにならず、owner-executed bridge経由で固定Sheetだけを読み書きできること
 2. bridge用の認証情報をSheet、repository、Spark taskへ露出しないこと
 3. 本番APIで公開済みのkeyだけをSheetへ確定記録すること
 4. 同じidempotency keyの再送がNOOPになること
 5. 状態競合時はSheetへ書き込まないこと
 
-対象Sheetにはサービスアカウントを編集者として登録済み。attribute conditionはrepository ID、owner ID、branch、この公開workflow、schedule/workflow_dispatchへ限定している。
+bridgeは固定Spreadsheet ID、固定4レンジ、XLSX export、Action 1の定型publication updateだけを許可する。production Sheetの共有画面には所有者以外を残さない。旧 `project-sixth-sheets@project-sixth-ops.iam.gserviceaccount.com` の編集権限は削除対象であり、旧WIF/service account構成は廃止する。
 
 ## 8. 引き継ぎ時の絶対ルール
 
@@ -201,6 +201,7 @@ Action 1は次を検証する:
 - 新規 source を監査なしで ACTIVE にしない。
 - 検索スニペットを最終証拠にしない。
 - 既存 audit を削除しない。
+- Gemini Spark本番Sheetを所有者以外へ共有しない。サービスアカウント、CI bot、別Googleアカウントをviewer/editorへ追加しない。
 - 本番ユーザーのアクセスを Spark / LLM の可用性に依存させない。
 - 報酬・経済値を Gemini に創作させない。
 
@@ -215,6 +216,7 @@ Gemini Spark の予測運用は次の個人所有Google Sheetだけを正本と�
 - Release: `2.1.0`
 - Timezone: `Asia/Tokyo`
 - GID dependency: `NONE`
+- Sharing: `OWNER_ONLY`
 
 全Skill/Taskはこのbase URLを内包する。Drive上の似た名前のSheetを検索・代替してはならない。アクセス不能、`05_CONFIG` のcontract/schema不一致、必要タブ欠落時はfail closedとし、別Sheetを作成・編集しない。`gid` は参照・契約に使用せず、処理対象タブはexact tab nameで指定する。
 

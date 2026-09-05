@@ -63,7 +63,7 @@ v0.4.2ではD1 migrationを追加していません。アクセスボーナス�
 - 公開APIのversionがv0.4.1であることを確認。
 - [dry-run](https://github.com/Yuzora-Yu/PROJECT_SIXTH/actions/runs/33950745512)はcommit `9814476`から公開予定6件を検証し、Git・Cloudflare・Google Sheetへの変更なしで成功。
 - [本番公開](https://github.com/Yuzora-Yu/PROJECT_SIXTH/actions/runs/33950796966)はcommit `9814476`から6件を公開し、生成commit `a140757`の本番確認とGoogle Sheetへの原子的な書き戻しを2026-09-05 15:48:43 JSTに完了。
-- Google認証はGitHub OIDCとWorkload Identity Federationを使用し、サービスアカウントキー、OAuthクライアントシークレット、個人用refresh tokenは使用していません。
+- このv0.4.1実行時点ではGitHub OIDCとWorkload Identity Federationを使用していましたが、Gemini Spark本番Sheetを共有状態にするため**現在は廃止**しています。現行はowner-executed Apps Script bridgeを使用し、Sheet共有は所有者のみにします。
 
 ### v0.4.0 — 2026-09-05
 

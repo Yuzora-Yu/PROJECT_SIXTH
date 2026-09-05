@@ -1,5 +1,7 @@
 # 検証結果 — 2026-09-05
 
+> 現行の絶対条件: Gemini Spark本番Sheetは所有者のみ。下記の過去実行記録にあるWIF/service account方式は廃止し、GitHub Actionsはowner-executed Apps Script bridge経由へ移行する。
+
 ## 自動検証
 
 - `npm test`: 38件成功。匿名セッション、アクセスボーナスの日次境界と同時取得、Daily、30秒粒子、戦闘、旧報酬ルールで開始済みの戦闘、26名の公開対象、数秘・MBTI・惑星配置、初期値補正、共有、現実予測の公開期間・回答保存を確認。
@@ -22,7 +24,7 @@
 
 - [dry-run](https://github.com/Yuzora-Yu/PROJECT_SIXTH/actions/runs/33950745512): commit `9814476`から公開予定6件を抽出し、固定時刻での再読、公開スナップショットのfingerprint、plan許可リスト、生成カタログ、repository checksを検証。Git commit・push、Cloudflare deploy、Google Sheet書き込みを行わず成功。
 - [本番公開](https://github.com/Yuzora-Yu/PROJECT_SIXTH/actions/runs/33950796966): commit `9814476`から予定どおり6件を公開。生成commit `a140757`を既存Cloudflare Workerへ配信し、公開APIで全6件を確認後、2026-09-05 15:48:43 JSTに6件の状態更新と監査ログ追記を1回の原子的なSheet更新で完了。
-- Google認証はGitHub OIDCとWorkload Identity Federationによる短期tokenだけを使用。ワークフローにはサービスアカウントキー、OAuthクライアントシークレット、個人用refresh tokenを使用・保存していません。
+- この本番公開実行時点ではGitHub OIDC + Workload Identity Federationを使用していた。Gemini Spark本番Sheetの共有状態を避けるため、この経路は廃止対象。現行workflowはApps Script bridgeのHMAC認証へ置き換える。
 - Cloudflareは既存Workerと既存bindingだけを使用し、新しい資源、有料機能、追加の請求設定は作成していません。
 
 ## 現実予測

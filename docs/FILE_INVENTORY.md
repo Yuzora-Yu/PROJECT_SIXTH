@@ -136,9 +136,16 @@
 ## v0.4.1の公開自動化で追加
 
 - `.github/workflows/publish-predictions.yml` — 公開条件を満たす予測だけをSheetからGit、既存Worker、Sheet確定記録へ反映。
-- `scripts/google-sheets-bridge.py` — Google OIDC tokenを使う固定Sheetのexport、公開計画、atomic確定更新。
+- `scripts/google-sheets-bridge.py` — 固定Sheetのexport、公開計画、atomic確定更新を扱うbridge client。初版はGoogle OIDCだったが、現在はowner-executed Apps Script bridgeへ移行。
 - `tests/test_google_sheets_bridge.py` — NOOP、競合、冪等監査、限定セル更新、XLSX検査を確認。
-- `docs/PREDICTION_AUTOMATION.md` — Google Cloud、GitHub、Cloudflareの設定と運用手順。
+- `docs/PREDICTION_AUTOMATION.md` — owner-only Sheet、Apps Script bridge、GitHub、Cloudflareの設定と運用手順。
+
+## 2026-09-05 Gemini Spark owner-only Sheet hotfix
+
+- `gas-github-bridge/Code.gs` — GitHub Actions用のHMAC認証付きowner-executed Apps Script bridge。
+- `gas-github-bridge/appsscript.json` — bridge専用の最小Google scope定義。
+- `gas-github-bridge/README.md` — deploy、GitHub設定、旧サービスアカウント権限削除の移行手順。
+- `.github/workflows/publish-predictions.yml` — WIF/service accountと`id-token: write`を廃止し、Apps Script bridgeへ切替。
 
 ## v0.4.2で追加
 

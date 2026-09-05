@@ -1,20 +1,23 @@
 #!/usr/bin/env python3
-"""Google Sheets bridge for PROJECT SIXTH prediction publication.
+"""Owner-only Google Sheets bridge for PROJECT SIXTH prediction publication.
 
-The bridge intentionally keeps Google credentials out of files and command-line
-arguments.  GitHub Actions supplies a short-lived access token through
-``GHA_GOOGLE_ACCESS_TOKEN``.
+GitHub Actions never receives Google credentials and never becomes a collaborator
+of the Gemini Spark spreadsheet.  It talks only to an owner-executed Apps Script
+web app using HMAC-signed HTTPS requests.
 """
 
 from __future__ import annotations
 
 import argparse
-import email.utils
+import base64
+import binascii
 import hashlib
+import hmac
 import io
 import json
 import os
 import re
+import secrets
 import sys
 import tempfile
 import time
@@ -178,6 +181,10 @@ AUDIT_RANGE = "'11_AUDIT_LOG'!A:P"
 MAX_PUBLICATIONS_PER_RUN = 6
 MAX_GET_ATTEMPTS = 3
 MAX_RETRY_DELAY_SECONDS = 5.0
+BRIDGE_PROTOCOL_VERSION = 1
+BRIDGE_URL_RE = re.compile(
+    r"^https://script\.google\.com/macros/s/[A-Za-z0-9_-]+/exec$"
+)
 
 
 class BridgeError(RuntimeError):
@@ -204,188 +211,199 @@ class ApiClient(Protocol):
     ) -> dict[str, Any]: ...
 
 
-class GoogleRestApi:
-    """Small standard-library Google Drive/Sheets REST client."""
+class AppsScriptBridgeApi:
+    """HMAC-authenticated client for the owner-executed Apps Script proxy."""
 
     def __init__(
         self,
-        access_token: str,
+        endpoint_url: str,
+        shared_secret: str,
         timeout: int = 30,
         *,
         sleep: Callable[[float], None] = time.sleep,
+        clock: Callable[[], float] = time.time,
+        nonce_factory: Callable[[], str] | None = None,
     ):
-        if not access_token or any(character.isspace() for character in access_token):
-            raise BridgeError("Google access token is missing or malformed")
-        self._access_token = access_token
+        endpoint_url = endpoint_url.strip()
+        if not BRIDGE_URL_RE.fullmatch(endpoint_url):
+            raise BridgeError(
+                "Apps Script bridge URL must be a production "
+                "https://script.google.com/macros/s/.../exec URL"
+            )
+        if not TOKEN_RE.fullmatch(shared_secret):
+            raise BridgeError("Apps Script bridge secret is missing or malformed")
+        self._endpoint_url = endpoint_url
+        self._shared_secret = shared_secret
         self._timeout = timeout
         self._sleep = sleep
+        self._clock = clock
+        self._nonce_factory = nonce_factory or (lambda: secrets.token_hex(16))
 
     @staticmethod
-    def _retry_delay(error: urllib.error.HTTPError, retry_number: int) -> float:
-        delay = 0.25 * (2 ** (retry_number - 1))
-        retry_after = error.headers.get("Retry-After") if error.headers else None
-        if retry_after:
-            try:
-                delay = float(retry_after)
-            except ValueError:
-                try:
-                    retry_time = email.utils.parsedate_to_datetime(retry_after)
-                    if retry_time.tzinfo is None:
-                        retry_time = retry_time.replace(tzinfo=timezone.utc)
-                    delay = max(
-                        0.0,
-                        (retry_time - datetime.now(timezone.utc)).total_seconds(),
-                    )
-                except (TypeError, ValueError, OverflowError):
-                    pass
-        return max(0.0, min(delay, MAX_RETRY_DELAY_SECONDS))
+    def _payload_json(payload: dict[str, Any]) -> str:
+        return json.dumps(
+            payload,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+
+    def _signed_body(self, operation: str, payload: dict[str, Any]) -> bytes:
+        timestamp = int(self._clock())
+        nonce = self._nonce_factory()
+        if not re.fullmatch(r"[0-9a-f]{32}", nonce):
+            raise BridgeError("Apps Script bridge nonce generator returned invalid data")
+        payload_json = self._payload_json(payload)
+        message = (
+            f"{BRIDGE_PROTOCOL_VERSION}\n{timestamp}\n{nonce}\n"
+            f"{operation}\n{payload_json}"
+        )
+        signature = hmac.new(
+            self._shared_secret.encode("utf-8"),
+            message.encode("utf-8"),
+            hashlib.sha256,
+        ).hexdigest()
+        envelope = {
+            "version": BRIDGE_PROTOCOL_VERSION,
+            "timestamp": timestamp,
+            "nonce": nonce,
+            "operation": operation,
+            "payload": payload_json,
+            "signature": signature,
+        }
+        return json.dumps(
+            envelope,
+            ensure_ascii=False,
+            separators=(",", ":"),
+        ).encode("utf-8")
+
+    @staticmethod
+    def _retry_delay(attempt: int) -> float:
+        return min(0.25 * (2 ** (attempt - 1)), MAX_RETRY_DELAY_SECONDS)
 
     def _request(
         self,
-        method: str,
-        url: str,
-        *,
-        body: dict[str, Any] | None = None,
         operation: str,
-        max_bytes: int,
-    ) -> tuple[bytes, str]:
-        payload = None
-        headers = {
-            "Authorization": f"Bearer {self._access_token}",
-            "Accept": "application/json",
-            "User-Agent": "PROJECT-SIXTH-GitHub-Action/1",
-        }
-        if body is not None:
-            payload = json.dumps(body, ensure_ascii=False).encode("utf-8")
-            headers["Content-Type"] = "application/json; charset=utf-8"
-        attempts = MAX_GET_ATTEMPTS if method == "GET" else 1
+        payload: dict[str, Any],
+        *,
+        retry_safe: bool,
+    ) -> dict[str, Any]:
+        attempts = MAX_GET_ATTEMPTS if retry_safe else 1
         for attempt in range(1, attempts + 1):
             request = urllib.request.Request(
-                url, data=payload, headers=headers, method=method
+                self._endpoint_url,
+                data=self._signed_body(operation, payload),
+                headers={
+                    "Accept": "application/json",
+                    "Content-Type": "application/json; charset=utf-8",
+                    "User-Agent": "PROJECT-SIXTH-GitHub-Action/2",
+                },
+                method="POST",
             )
             try:
-                with urllib.request.urlopen(
-                    request, timeout=self._timeout
-                ) as response:
+                with urllib.request.urlopen(request, timeout=self._timeout) as response:
                     content_type = response.headers.get("Content-Type", "")
-                    data = response.read(max_bytes + 1)
-                break
+                    data = response.read(25 * 1024 * 1024 + 1)
             except urllib.error.HTTPError as error:
-                retryable = error.code == 429 or 500 <= error.code <= 599
-                retry_delay = (
-                    self._retry_delay(error, attempt)
-                    if retryable and attempt < attempts
-                    else None
-                )
                 status_code = error.code
                 error.close()
-                if retryable and attempt < attempts:
-                    self._sleep(retry_delay)
+                if retry_safe and attempt < attempts and (
+                    status_code == 429 or 500 <= status_code <= 599
+                ):
+                    self._sleep(self._retry_delay(attempt))
                     continue
                 raise BridgeError(
-                    f"Google API {operation} failed with HTTP {status_code}"
+                    f"Apps Script bridge transport failed with HTTP {status_code}"
                 ) from None
             except (urllib.error.URLError, TimeoutError, OSError) as error:
+                if retry_safe and attempt < attempts:
+                    self._sleep(self._retry_delay(attempt))
+                    continue
                 raise BridgeError(
-                    f"Google API {operation} transport failed: "
+                    "Apps Script bridge transport failed: "
                     f"{type(error).__name__}"
                 ) from None
-        if len(data) > max_bytes:
-            raise BridgeError(f"Google API {operation} response exceeded size limit")
-        return data, content_type
 
-    def _json(
-        self,
-        method: str,
-        url: str,
-        *,
-        body: dict[str, Any] | None = None,
-        operation: str,
-    ) -> dict[str, Any]:
-        data, content_type = self._request(
-            method,
-            url,
-            body=body,
-            operation=operation,
-            max_bytes=25 * 1024 * 1024,
-        )
-        if content_type.split(";", 1)[0].strip().lower() != "application/json":
-            raise BridgeError(f"Google API {operation} returned a non-JSON response")
-        try:
-            value = json.loads(data.decode("utf-8"))
-        except (UnicodeDecodeError, json.JSONDecodeError):
-            raise BridgeError(f"Google API {operation} returned malformed JSON") from None
-        if not isinstance(value, dict):
-            raise BridgeError(f"Google API {operation} returned an invalid JSON object")
-        return value
+            if len(data) > 25 * 1024 * 1024:
+                raise BridgeError("Apps Script bridge response exceeded size limit")
+            if content_type.split(";", 1)[0].strip().lower() != "application/json":
+                raise BridgeError("Apps Script bridge returned a non-JSON response")
+            try:
+                envelope = json.loads(data.decode("utf-8"))
+            except (UnicodeDecodeError, json.JSONDecodeError):
+                raise BridgeError("Apps Script bridge returned malformed JSON") from None
+            if not isinstance(envelope, dict):
+                raise BridgeError("Apps Script bridge returned an invalid JSON object")
+            if envelope.get("ok") is not True:
+                message = envelope.get("message")
+                if not isinstance(message, str) or not message:
+                    message = "Apps Script bridge rejected the request"
+                if retry_safe and envelope.get("retryable") is True and attempt < attempts:
+                    self._sleep(self._retry_delay(attempt))
+                    continue
+                raise BridgeError(message)
+            result = envelope.get("result")
+            if not isinstance(result, dict):
+                raise BridgeError("Apps Script bridge response has no result object")
+            return result
+        raise BridgeError("Apps Script bridge retry budget was exhausted")
 
     def export_xlsx(self, spreadsheet_id: str) -> BinaryResponse:
-        file_id = urllib.parse.quote(spreadsheet_id, safe="")
-        query = urllib.parse.urlencode({"mimeType": XLSX_MIME})
-        data, content_type = self._request(
-            "GET",
-            f"https://www.googleapis.com/drive/v3/files/{file_id}/export?{query}",
-            operation="Drive export",
-            max_bytes=MAX_XLSX_BYTES,
+        result = self._request(
+            "export_xlsx",
+            {"spreadsheet_id": spreadsheet_id},
+            retry_safe=True,
         )
+        encoded = result.get("data_base64")
+        content_type = result.get("content_type")
+        expected_sha256 = result.get("sha256")
+        if not isinstance(encoded, str) or not isinstance(content_type, str):
+            raise BridgeError("Apps Script bridge returned an invalid XLSX export")
+        try:
+            data = base64.b64decode(encoded, validate=True)
+        except (ValueError, binascii.Error):
+            raise BridgeError("Apps Script bridge returned invalid base64 XLSX data") from None
+        if (
+            not isinstance(expected_sha256, str)
+            or not TOKEN_RE.fullmatch(expected_sha256)
+            or not hmac.compare_digest(hashlib.sha256(data).hexdigest(), expected_sha256)
+        ):
+            raise BridgeError("Apps Script bridge XLSX checksum did not match")
         return BinaryResponse(data=data, content_type=content_type)
 
     def get_spreadsheet_metadata(self, spreadsheet_id: str) -> dict[str, Any]:
-        sheet_id = urllib.parse.quote(spreadsheet_id, safe="")
-        query = urllib.parse.urlencode(
-            {
-                "includeGridData": "false",
-                "fields": "spreadsheetId,properties(timeZone),sheets(properties(sheetId,title))",
-            }
-        )
-        return self._json(
-            "GET",
-            f"https://sheets.googleapis.com/v4/spreadsheets/{sheet_id}?{query}",
-            operation="Sheets metadata read",
+        return self._request(
+            "get_spreadsheet_metadata",
+            {"spreadsheet_id": spreadsheet_id},
+            retry_safe=True,
         )
 
     def batch_get_values(
         self, spreadsheet_id: str, ranges: Sequence[str]
     ) -> list[list[list[Any]]]:
-        sheet_id = urllib.parse.quote(spreadsheet_id, safe="")
-        query = urllib.parse.urlencode(
-            {
-                "ranges": list(ranges),
-                "majorDimension": "ROWS",
-                "valueRenderOption": "FORMATTED_VALUE",
-                "dateTimeRenderOption": "FORMATTED_STRING",
-            },
-            doseq=True,
+        result = self._request(
+            "batch_get_values",
+            {"spreadsheet_id": spreadsheet_id, "ranges": list(ranges)},
+            retry_safe=True,
         )
-        response = self._json(
-            "GET",
-            f"https://sheets.googleapis.com/v4/spreadsheets/{sheet_id}/values:batchGet?{query}",
-            operation="Sheets values read",
-        )
-        value_ranges = response.get("valueRanges")
-        if not isinstance(value_ranges, list) or len(value_ranges) != len(ranges):
-            raise BridgeError("Sheets values read returned an incomplete range set")
-        result: list[list[list[Any]]] = []
-        for value_range in value_ranges:
-            if not isinstance(value_range, dict):
-                raise BridgeError("Sheets values read returned an invalid range")
-            values = value_range.get("values", [])
-            if not isinstance(values, list) or any(
-                not isinstance(row, list) for row in values
-            ):
-                raise BridgeError("Sheets values read returned malformed rows")
-            result.append(values)
-        return result
+        values = result.get("ranges")
+        if not isinstance(values, list) or len(values) != len(ranges):
+            raise BridgeError("Apps Script bridge returned an incomplete range set")
+        if any(
+            not isinstance(value_range, list)
+            or any(not isinstance(row, list) for row in value_range)
+            for value_range in values
+        ):
+            raise BridgeError("Apps Script bridge returned malformed rows")
+        return values
 
     def batch_update(
         self, spreadsheet_id: str, requests: Sequence[dict[str, Any]]
     ) -> dict[str, Any]:
-        sheet_id = urllib.parse.quote(spreadsheet_id, safe="")
-        return self._json(
-            "POST",
-            f"https://sheets.googleapis.com/v4/spreadsheets/{sheet_id}:batchUpdate",
-            body={"requests": list(requests)},
-            operation="Sheets atomic publication commit",
+        return self._request(
+            "batch_update",
+            {"spreadsheet_id": spreadsheet_id, "requests": list(requests)},
+            retry_safe=False,
         )
 
 
@@ -1322,8 +1340,9 @@ def _parser() -> argparse.ArgumentParser:
 
 def run(argv: Sequence[str]) -> int:
     arguments = _parser().parse_args(argv)
-    token = os.environ.get("GHA_GOOGLE_ACCESS_TOKEN", "")
-    api = GoogleRestApi(token)
+    endpoint_url = os.environ.get("GEMINI_SPARK_BRIDGE_URL", "")
+    shared_secret = os.environ.get("GEMINI_SPARK_BRIDGE_SECRET", "")
+    api = AppsScriptBridgeApi(endpoint_url, shared_secret)
     bridge = SheetsBridge(api, arguments.spreadsheet_id)
 
     if arguments.command == "export":

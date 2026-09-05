@@ -14,7 +14,6 @@ on:
 
 permissions:
   contents: write
-  id-token: write
 
 concurrency:
   group: prediction-publication
@@ -37,15 +36,15 @@ jobs:
     steps:
       - name: Validate workflow configuration
         env:
-          GCP_WIF_PROVIDER: ${{ vars.GCP_WIF_PROVIDER }}
-          GCP_SERVICE_ACCOUNT: ${{ vars.GCP_SERVICE_ACCOUNT }}
+          GEMINI_SPARK_BRIDGE_URL: ${{ vars.GEMINI_SPARK_BRIDGE_URL }}
+          GEMINI_SPARK_BRIDGE_SECRET: ${{ secrets.GEMINI_SPARK_BRIDGE_SECRET }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
         run: |
           set -euo pipefail
-          for name in GCP_WIF_PROVIDER GCP_SERVICE_ACCOUNT PREDICTION_SPREADSHEET_ID; do
+          for name in GEMINI_SPARK_BRIDGE_URL GEMINI_SPARK_BRIDGE_SECRET PREDICTION_SPREADSHEET_ID; do
             if [ -z "${!name:-}" ]; then
-              echo "::error::Required Google configuration is missing: ${name}"
+              echo "::error::Required Gemini Spark bridge configuration is missing: ${name}"
               exit 1
             fi
           done
@@ -92,22 +91,10 @@ jobs:
             --header "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
             "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts/project-sixth/settings"
 
-      - id: google-auth
-        name: Authenticate to Google without a service-account key
-        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3
-        with:
-          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
-          service_account: ${{ vars.GCP_SERVICE_ACCOUNT }}
-          token_format: access_token
-          access_token_lifetime: 3600s
-          access_token_scopes: |-
-            https://www.googleapis.com/auth/drive.readonly
-            https://www.googleapis.com/auth/spreadsheets
-          create_credentials_file: false
-
       - name: Capture the initial live publication plan
         env:
-          GHA_GOOGLE_ACCESS_TOKEN: ${{ steps.google-auth.outputs.access_token }}
+          GEMINI_SPARK_BRIDGE_URL: ${{ vars.GEMINI_SPARK_BRIDGE_URL }}
+          GEMINI_SPARK_BRIDGE_SECRET: ${{ secrets.GEMINI_SPARK_BRIDGE_SECRET }}
         run: >-
           python scripts/google-sheets-bridge.py
           --spreadsheet-id "$PREDICTION_SPREADSHEET_ID"
@@ -145,7 +132,8 @@ jobs:
 
       - name: Export the canonical Sheet
         env:
-          GHA_GOOGLE_ACCESS_TOKEN: ${{ steps.google-auth.outputs.access_token }}
+          GEMINI_SPARK_BRIDGE_URL: ${{ vars.GEMINI_SPARK_BRIDGE_URL }}
+          GEMINI_SPARK_BRIDGE_SECRET: ${{ secrets.GEMINI_SPARK_BRIDGE_SECRET }}
         run: >-
           python scripts/google-sheets-bridge.py
           --spreadsheet-id "$PREDICTION_SPREADSHEET_ID"
@@ -154,7 +142,8 @@ jobs:
 
       - name: Re-read the live plan at the fixed time
         env:
-          GHA_GOOGLE_ACCESS_TOKEN: ${{ steps.google-auth.outputs.access_token }}
+          GEMINI_SPARK_BRIDGE_URL: ${{ vars.GEMINI_SPARK_BRIDGE_URL }}
+          GEMINI_SPARK_BRIDGE_SECRET: ${{ secrets.GEMINI_SPARK_BRIDGE_SECRET }}
         run: >-
           python scripts/google-sheets-bridge.py
           --spreadsheet-id "$PREDICTION_SPREADSHEET_ID"
@@ -312,7 +301,8 @@ jobs:
 
       - name: Re-read the live plan before publication
         env:
-          GHA_GOOGLE_ACCESS_TOKEN: ${{ steps.google-auth.outputs.access_token }}
+          GEMINI_SPARK_BRIDGE_URL: ${{ vars.GEMINI_SPARK_BRIDGE_URL }}
+          GEMINI_SPARK_BRIDGE_SECRET: ${{ secrets.GEMINI_SPARK_BRIDGE_SECRET }}
         run: >-
           python scripts/google-sheets-bridge.py
           --spreadsheet-id "$PREDICTION_SPREADSHEET_ID"
@@ -506,7 +496,8 @@ jobs:
       - name: Mark verified predictions as published
         if: env.DRY_RUN == 'false' && steps.plan.outputs.count != '0'
         env:
-          GHA_GOOGLE_ACCESS_TOKEN: ${{ steps.google-auth.outputs.access_token }}
+          GEMINI_SPARK_BRIDGE_URL: ${{ vars.GEMINI_SPARK_BRIDGE_URL }}
+          GEMINI_SPARK_BRIDGE_SECRET: ${{ secrets.GEMINI_SPARK_BRIDGE_SECRET }}
         run: >-
           python scripts/google-sheets-bridge.py
           --spreadsheet-id "$PREDICTION_SPREADSHEET_ID"
