@@ -1,7 +1,7 @@
 ---
 name: settle-prediction-result
 description: T5/T6の独立証拠とresolution_ruleを監査し、Git Action 2へ進める唯一の最終結果ゲートを管理する。
-version: 2.1.0
+version: 2.2.0
 ---
 
 # settle-prediction-result
@@ -36,6 +36,10 @@ After every write, re-read the fields you changed. If the read-back does not mat
 - `11_AUDIT_LOG` and `12_RUN_LOG` are append-only. Never overwrite a non-empty row.
 - Create unique `audit_id` / `run_id`, append to a new row, then immediately search the log for that ID. If the ID is missing or duplicated, append once more to a fresh row. If verification still fails, record/return ERROR and do not advance workflow state any further.
 - Tasks sharing the same `:00`, `:15`, or `:30` schedule slot must never wait for, assume, or depend on the other task's start/end order. Use only row `status` / `gate` and idempotency keys.
+- `12_RUN_LOG.scheduled_for_jst` は、Spark/プラットフォームから権威あるscheduled timeが与えられた場合だけ記録する。Run now等で不明なら空欄にし、最近傍の`:00/:15/:30/:45`を推測しない。手動実行は `spark_task_url_or_note` に `MANUAL_RUN` を含める。
+- `12_RUN_LOG.status` が `SUCCESS` または `NOOP` の場合、`error_code`, `error_summary`, `retry_hint` は必ず空欄。`ERROR` の場合だけエラー情報を書く。
+- `11_AUDIT_LOG.evidence_url_1/2` および結果URL列は、実在する `http://` / `https://` URLまたは空欄のみ。UI引用番号、脚注番号、内部citation marker、裸の数値（例: `937`）を書かない。
+- ログ書込前に型を自己検査し、上記に違反する値を生成した場合はその値を書かず `E020` としてERROR扱いにする。
 
 ## Procedure
 
