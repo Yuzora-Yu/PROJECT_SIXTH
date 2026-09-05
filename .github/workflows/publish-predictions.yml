@@ -130,6 +130,29 @@ jobs:
           print(f"as_of_jst={as_of}")
           PY
 
+      - name: Report non-blocking Sheet audit health
+        env:
+          PLAN_PATH: ${{ runner.temp }}/initial-plan.json
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          plan = json.loads(Path(os.environ["PLAN_PATH"]).read_text(encoding="utf-8"))
+          health = plan.get("audit_health") or {}
+          count = health.get("duplicate_audit_id_count", 0)
+          if isinstance(count, int) and count > 0:
+              ids = health.get("duplicate_audit_ids") or []
+              shown = ", ".join(str(value) for value in ids[:5])
+              suffix = " (more omitted)" if health.get("truncated") else ""
+              print(
+                  f"::warning::11_AUDIT_LOG has {count} duplicate non-publication "
+                  f"audit_id value(s): {shown}{suffix}. Publication continues because "
+                  "GitHub Action 1 idempotency is validated independently."
+              )
+          PY
+
       - name: Export the canonical Sheet
         if: steps.plan.outputs.count != '0'
         env:

@@ -1,5 +1,5 @@
 /**
- * PROJECT SIXTH - owner-only Gemini Spark Sheet bridge v1.1.1
+ * PROJECT SIXTH - owner-only Gemini Spark Sheet bridge v1.2.0
  *
  * Deploy this as a SEPARATE Apps Script Web App:
  * - Execute as: Me (the spreadsheet owner)
@@ -13,6 +13,7 @@
 
 var BRIDGE_CONFIG = Object.freeze({
   PROTOCOL_VERSION: 1,
+  BRIDGE_VERSION: '1.2.0',
   TARGET_SPREADSHEET_ID: '1ZGb__FQT25BPkzovq2UTfO4clvE7G71PiRm3yywSj6Y',
   XLSX_MIME: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   PUBLIC_URL: 'https://yu-zora.com/project_sixth/#prediction',
@@ -81,14 +82,32 @@ function authorizeBridge() {
   };
 }
 
+function doGet() {
+  // Public health probe only. It intentionally exposes no spreadsheet ID, secret,
+  // OAuth token, cache state, or user data.
+  return jsonOutput_({
+    ok: true,
+    service: 'project-sixth-sheet-bridge',
+    bridge_version: BRIDGE_CONFIG.BRIDGE_VERSION,
+    protocol_version: BRIDGE_CONFIG.PROTOCOL_VERSION
+  });
+}
+
 function doPost(e) {
   try {
     var request = authenticateRequest_(e);
     var result = dispatchOperation_(request.operation, request.payload);
-    return jsonOutput_({ok: true, result: result});
+    return jsonOutput_({
+      ok: true,
+      bridge_version: BRIDGE_CONFIG.BRIDGE_VERSION,
+      protocol_version: BRIDGE_CONFIG.PROTOCOL_VERSION,
+      result: result
+    });
   } catch (error) {
     return jsonOutput_({
       ok: false,
+      bridge_version: BRIDGE_CONFIG.BRIDGE_VERSION,
+      protocol_version: BRIDGE_CONFIG.PROTOCOL_VERSION,
       retryable: error && error.retryable === true,
       message: safeErrorMessage_(error)
     });

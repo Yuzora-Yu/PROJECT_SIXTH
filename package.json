@@ -11,7 +11,7 @@
     "test:google-sheets-bridge": "python -m unittest tests/test_google_sheets_bridge.py",
     "build": "node scripts/build.mjs",
     "test": "node --test tests/*.test.mjs",
-    "check": "npm run test:predictions-import && npm run test:google-sheets-bridge && npm run test && npm run build",
+    "check": "npm run test:predictions-import && npm run test:google-sheets-bridge && npm run test:spark-skill-sync && npm run test && npm run build",
     "dev:worker": "npm run build && wrangler dev --env staging",
     "db:local": "wrangler d1 migrations apply DB --local --env staging",
     "db:staging": "wrangler d1 migrations apply project-sixth-staging --remote --env staging",
@@ -23,7 +23,8 @@
     "format": "prettier --write index.html css js shared worker scripts tests docs/*.md README.md package.json playwright.config.js wrangler.jsonc .github",
     "predev": "node scripts/prepare-vendor.mjs",
     "pretest": "node scripts/prepare-vendor.mjs",
-    "deploy": "npm run predictions:check && npm run check && wrangler deploy"
+    "deploy": "npm run predictions:check && npm run check && wrangler deploy",
+    "test:spark-skill-sync": "python -m unittest tests/test_spark_skill_sync.py"
   },
   "engines": {
     "node": ">=24.0.0"

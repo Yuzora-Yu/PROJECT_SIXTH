@@ -1,4 +1,4 @@
-# PROJECT SIXTH Prediction Ops — Canonical Operations v2.1.0
+# PROJECT SIXTH Prediction Ops — Canonical Operations
 
 Spreadsheet / Gemini Spark Skills / Tasks / GAS は同じcontractで運用する。
 
@@ -6,9 +6,9 @@ Spreadsheet / Gemini Spark Skills / Tasks / GAS は同じcontractで運用する
 
 - contract_id: `PROJECT_SIXTH_PREDICTION_OPS`
 - schema_version: `2.0.0`
-- release_version: `2.1.0`
-- skill_package_version: `2.1.0`
-- task_package_version: `2.1.0`
+- release_version: `2.2.0`
+- skill_package_version: `2.3.0`
+- task_package_version: `2.2.0`
 - compatible GAS: `2.0.3`
 - target spreadsheet id: `1ZGb__FQT25BPkzovq2UTfO4clvE7G71PiRm3yywSj6Y`
 - target base URL: `https://docs.google.com/spreadsheets/d/1ZGb__FQT25BPkzovq2UTfO4clvE7G71PiRm3yywSj6Y/edit`
@@ -44,7 +44,7 @@ T01 収集 → T02 ドラフト → T03 独立監査 → T04 掲載判定 → Gi
 - fail closed
 - T5/T6は独立確認
 - `09_RESULTS` は `prediction_id|version` を一意キーとしてcreate-or-update
-- 同一slotでのログ追記は unique id → append → verify → collision時1回retry
+- 同一slotでのログ追記は precheck(unique id=0) → append once → verify(unique id=1)。不明/欠落/重複時はE017で停止し、追記retryしない
 - source成長は T1/T2 discover → T3 verify → T4 approve/promote
 - audit/run logはappend-only
 - Git Action 1: `prediction_id|version`

@@ -205,7 +205,7 @@ bridgeは固定Spreadsheet ID、固定4レンジ、XLSX export、Action 1の定�
 - 本番ユーザーのアクセスを Spark / LLM の可用性に依存させない。
 - 報酬・経済値を Gemini に創作させない。
 
-## 固定Spreadsheet（release 2.1.0）
+## 固定Spreadsheet（public release 2.2.0 / Skill package 2.3.0）
 
 Gemini Spark の予測運用は次の個人所有Google Sheetだけを正本として扱う。
 
@@ -213,11 +213,11 @@ Gemini Spark の予測運用は次の個人所有Google Sheetだけを正本と�
 - Base URL: `https://docs.google.com/spreadsheets/d/1ZGb__FQT25BPkzovq2UTfO4clvE7G71PiRm3yywSj6Y/edit`
 - Contract: `PROJECT_SIXTH_PREDICTION_OPS`
 - Schema: `2.0.0`
-- Release: `2.1.0`
+- Release: `2.2.0`
 - Timezone: `Asia/Tokyo`
 - GID dependency: `NONE`
 - Sharing: `OWNER_ONLY`
 
 全Skill/Taskはこのbase URLを内包する。Drive上の似た名前のSheetを検索・代替してはならない。アクセス不能、`05_CONFIG` のcontract/schema不一致、必要タブ欠落時はfail closedとし、別Sheetを作成・編集しない。`gid` は参照・契約に使用せず、処理対象タブはexact tab nameで指定する。
 
-Task本文は `gemini-spark/tasks/` の個別Markdownを登録用正本とする。Skill本文は `gemini-spark/skills/`、登録ZIPは `gemini-spark/packages/` を正本とする。静的QAはrelease 2.1.0で89/89 PASS済み。次の境界はGemini Spark実行時検証。
+Task本文は `gemini-spark/tasks/` の個別Markdownを登録用正本とする。Skill本文は `gemini-spark/skills/`、登録ZIPは `gemini-spark/packages/` を正本とする。Skill package 2.3.0では監査/実行ログ追記を append-once + fail-closed に統一し、`gemini-spark/` をcanonicalとしてmirror/package driftをCI検証する。

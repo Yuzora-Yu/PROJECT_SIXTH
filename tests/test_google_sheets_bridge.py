@@ -445,6 +445,37 @@ class PlanTests(unittest.TestCase):
             conflicting.plan()
 
 
+    def test_unrelated_duplicate_audit_ids_are_reported_but_do_not_block_plan(self):
+        first = other_stage_audit(1)
+        second = other_stage_audit(2)
+        second["audit_id"] = first["audit_id"]
+        plan = BRIDGE.SheetsBridge(
+            FakeApi([snapshot([prediction_record(3)], [first, second])]),
+            clock=lambda: FIXED_NOW,
+        ).plan()
+
+        self.assertEqual(len(plan["items"]), 1)
+        self.assertEqual(plan["audit_health"]["duplicate_audit_id_count"], 1)
+        self.assertEqual(
+            plan["audit_health"]["duplicate_audit_ids"], [first["audit_id"]]
+        )
+
+    def test_duplicate_successful_publication_audit_id_remains_fail_closed(self):
+        duplicate_id = "AUD-ACTION1-duplicate"
+        audits = [
+            publication_audit(1, audit_id=duplicate_id),
+            publication_audit(2, audit_id=duplicate_id),
+        ]
+        bridge = BRIDGE.SheetsBridge(
+            FakeApi([snapshot([published_record(1), published_record(2)], audits)]),
+            clock=lambda: FIXED_NOW,
+        )
+        with self.assertRaisesRegex(
+            BRIDGE.BridgeError, "duplicate successful publication audit_id"
+        ):
+            bridge.plan()
+
+
 class CommitTests(unittest.TestCase):
     def _plan_and_api(self, after_snapshot):
         before = snapshot([prediction_record()], [other_stage_audit()])

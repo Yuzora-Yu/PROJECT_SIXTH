@@ -685,22 +685,54 @@ def _state_token(
     )
 
 
+def _audit_health(rows: Sequence[dict[str, Any]]) -> dict[str, Any]:
+    """Return non-blocking integrity diagnostics for the shared Spark audit log.
+
+    GitHub Action 1 must not become unavailable because an unrelated Spark stage
+    duplicated an audit row. Publication idempotency is enforced separately on
+    successful PREDICTION_PUBLISHED rows, which remain fail-closed below.
+    """
+    by_id: dict[str, list[int]] = {}
+    for record in rows:
+        audit_id = _text(record["audit_id"])
+        if not audit_id:
+            continue
+        by_id.setdefault(audit_id, []).append(int(record["_row_number"]))
+    duplicates = {
+        audit_id: row_numbers
+        for audit_id, row_numbers in by_id.items()
+        if len(row_numbers) > 1
+    }
+    duplicate_ids = sorted(duplicates)
+    return {
+        "duplicate_audit_id_count": len(duplicate_ids),
+        "duplicate_audit_ids": duplicate_ids[:20],
+        "duplicate_audit_rows": {
+            audit_id: duplicates[audit_id] for audit_id in duplicate_ids[:20]
+        },
+        "truncated": len(duplicate_ids) > 20,
+    }
+
+
 def _publication_audits(
     rows: Sequence[dict[str, Any]],
 ) -> dict[str, dict[str, Any]]:
     result: dict[str, dict[str, Any]] = {}
-    audit_ids: set[str] = set()
+    publication_audit_ids: set[str] = set()
     for record in rows:
-        audit_id = _text(record["audit_id"])
-        if audit_id:
-            if audit_id in audit_ids:
-                raise BridgeError("11_AUDIT_LOG contains a duplicate audit_id")
-            audit_ids.add(audit_id)
         if not (
             _text(record["action"]) == "PREDICTION_PUBLISHED"
             and _text(record["decision"]) == "SUCCESS"
         ):
             continue
+        audit_id = _text(record["audit_id"])
+        if not audit_id:
+            raise BridgeError("11_AUDIT_LOG publication audit is missing audit_id")
+        if audit_id in publication_audit_ids:
+            raise BridgeError(
+                "11_AUDIT_LOG contains a duplicate successful publication audit_id"
+            )
+        publication_audit_ids.add(audit_id)
         key = _text(record["idempotency_key"])
         if not key:
             raise BridgeError("11_AUDIT_LOG publication audit is missing its key")
@@ -989,6 +1021,7 @@ class SheetsBridge:
         fingerprint = _hash_json(fingerprint_input)
         return {
             "plan_version": 1,
+            "audit_health": _audit_health(snapshot.audit_rows),
             "spreadsheet_id": self.spreadsheet_id,
             "contract_id": snapshot.config["contract_id"],
             "schema_version": snapshot.config["schema_version"],
