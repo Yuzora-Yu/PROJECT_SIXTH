@@ -129,6 +129,19 @@ v0.4.2 / MVP。Vanilla JS ES Modules + Canvas + Workers / D1。ブランチは `
 - 保留キャラで開始済みの戦闘は次回の成功する保存操作内で一度だけ精算し、元の記録と報酬を保持。次の戦闘を妨げない。既存のAPIトランザクションと操作IDによる二重加算防止を使用。
 - 公開対象による召喚/操作制限、マスタ保持、既存所持データ、開始済み戦闘の一度だけの精算を検証。全33件成功。
 
+## v0.5.0 — 現実予測 RC投票・オッズ・払戻
+
+- `prediction_id|version`ごとに10〜1000 RCを10刻みで投票。最初の10 RCは無料stakeとしてpoolと払戻へ含め、残高0でも10 RCだけは投票可能。1000 RC投票時の実残高消費は990 RC。
+- パリミュチュエル方式でcurrent oddsを表示し、締切後のpool snapshotをfinal oddsと払戻の正本にする。明示的house takeは0%、integer `floor` の端数だけ未発行。
+- 払戻は `floor(stake * total_pool / winning_pool)`。RC側の倍率にcapを設けない。
+- 的中時だけ既存`foresight`（予見）XPへ `20 + floor(10 * log2(min(finalOdds, 8)))` を加算。stake額には比例させず、初期XP odds capは8x。将来16x候補を設定コメントに残す。
+- D1へbet、option pool cache、market snapshot、RC ledger、XP ledgerを追加。player JSONのRC/XPを引き続き正本とし、CAS + D1 batch + Idempotency-Key + UNIQUE制約で二重消費・二重払戻を防ぐ。
+- 初回betだけTurnstileを要求し、server-side Siteverifyで`action=prediction-bet`、productionではhostnameも検証。以後は匿名player JSONのverified時刻を使う。
+- Cloudflare Rate Limiting bindingは20回/60秒/player。荒らし抑制だけに使用し、会計の正確性には使わない。
+- stagingは別Worker `project-sixth-staging`、別D1、`workers.dev`、Cloudflare公式dummy Turnstile credentialsを使用。本番routeや本番Turnstile secretをstagingへ流用しない。
+- Gemini Spark owner-only Sheetにはplayer bet、オッズ、RC、XPを一切書き戻さない。Sheet/Actionは問題・締切・最終結果まで、ゲーム経済はWorker/D1へ分離する。
+- 旧v0.4.x selectionは表示互換だけ残し、自動で無料10 RC ticketへ移行しない。締切前なら利用者が明示的に新RC投票を確定する。
+
 ## v0.4.0 — 現実予測とスマホ表示
 
 - 添付の運用台帳release 2.2.0から、`APPROVED_FOR_PUBLISH`かつ`publish_gate=READY`で公開時刻を迎えた6件だけを公開カタログへ投影。HOLD・下書き・候補と内部監査列は配信しない。

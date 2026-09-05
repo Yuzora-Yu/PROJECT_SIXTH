@@ -74,7 +74,9 @@ test("desktop and phone journeys, daily/training, summon, battle, privacy and re
   const firstChoice = firstPrediction.locator(".prediction-choice").first();
   await firstChoice.click();
   await expect(firstChoice).toHaveAttribute("aria-pressed", "true");
-  await expect(firstPrediction).toContainText("記録済み");
+  await firstPrediction.getByRole("button", { name: "この予想に投票する" }).click();
+  await expect(firstPrediction).toContainText("現在の投票");
+  await expect(page.locator("#account")).toContainText("320");
   await page.reload();
   await expect(
     page

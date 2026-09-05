@@ -2,6 +2,15 @@
 
 > 現行の絶対条件: Gemini Spark本番Sheetは所有者のみ。下記の過去実行記録にあるWIF/service account方式は廃止し、GitHub Actionsはowner-executed Apps Script bridge経由へ移行する。
 
+## v0.5.0 RCベット実装 — ローカル検証（本番未適用）
+
+- `tests/api.test.mjs` と `tests/prediction-betting.test.mjs`: 16件中16件成功。無料10 RC、100 RCへの増額時の90 RC消費、50 RCへの減額返金、選択変更、pool再集計、Idempotency-Key再送、同一player同時更新のCAS競合、締切snapshotとの競合拒否、source-of-truth betからの市場snapshot固定、締切拒否、Turnstile初回検証を確認。
+- `tests/economy.test.mjs` と `tests/prediction-betting.test.mjs`: 9件中9件成功。10〜1000 RC / 10 RC刻み、無料10 RC、RC払戻に倍率capなし、XPだけ8倍cap、外れ0 XP、的中時の「予見」XP、二重settlementなしを確認。
+- Python: `tests/test_import_predictions.py` と `tests/test_google_sheets_bridge.py` は39件中39件成功。owner-only Sheet bridgeの既存契約を維持。
+- 全Nodeテストは39件中37件成功し、既存 `vendor/astronomy.js` をこの検証環境で生成できなかった2テストファイルだけ `ERR_MODULE_NOT_FOUND` で未完走。ベット機能の新規テスト失敗ではない。
+- この検証環境はNode 22で、repository要件はNode 24以上。ユーザー環境（Node 24.15.0）で `npm ci` 後に `npm run check`、`npm run deploy:staging:check` を再実行してからstagingへ適用する。
+- 本番D1 `project-sixth` のschema、本番Worker、本番routeはこの実装検証では変更していない。
+
 ## 自動検証
 
 - `npm test`: 38件成功。匿名セッション、アクセスボーナスの日次境界と同時取得、Daily、30秒粒子、戦闘、旧報酬ルールで開始済みの戦闘、26名の公開対象、数秘・MBTI・惑星配置、初期値補正、共有、現実予測の公開期間・回答保存を確認。
@@ -35,7 +44,7 @@
 - 公開時刻前の承認行、候補、下書き、内部監査列を生成カタログとAPIから除外。
 - 同じID・versionの公開内容変更、公開済み履歴の削除、確定結果の差し替えを取込時に拒否。
 - 正解は `SETTLED` だけで公開し、`settled_at` が結果確認予定より前の行を拒否。
-- 回答は匿名プレイヤーの既存D1 JSONへ保存。締切まで変更でき、RC・XP・確率表示には影響しない。
+- v0.5.0から回答はD1の専用betテーブルへ保存し、10〜1000 RC・無料10 RC・市場オッズ・結果確定後のRC払戻と「予見」XPを扱う。Gemini Spark Sheetは問題・締切・結果の運用正本だけで、個人betや残高は保持しない。
 - 運用xlsxはローカル専用としてGitの追跡対象から除外。配信物には含めない。
 
 ## ブラウザ

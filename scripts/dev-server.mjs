@@ -1,14 +1,26 @@
 import http from "node:http";
-import { readFile, mkdir, stat } from "node:fs/promises";
+import { readFile, mkdir, readdir, stat } from "node:fs/promises";
 import path from "node:path";
 import { handleApi } from "../worker/api.js";
 import { localDatabase } from "./sqlite.mjs";
 const root = path.resolve(import.meta.dirname, "..");
 await mkdir(path.join(root, ".local"), { recursive: true });
 const db = localDatabase(path.join(root, ".local/sixth.sqlite"));
-db.native.exec(
-  await readFile(path.join(root, "migrations/0001_initial.sql"), "utf8"),
-);
+for (const migration of (await readdir(path.join(root, "migrations")))
+  .filter((name) => /^\d+_.+\.sql$/.test(name))
+  .sort())
+  db.native.exec(await readFile(path.join(root, "migrations", migration), "utf8"));
+
+// Cloudflare's published dummy credentials are intentionally used only by the
+// local development server. They accept dummy Turnstile tokens and have no
+// production authority.
+const localRuntime = {
+  DB: db,
+  ENVIRONMENT: "local",
+  TURNSTILE_SITE_KEY: "1x00000000000000000000AA",
+  TURNSTILE_SECRET_KEY: "1x0000000000000000000000000000000AA",
+  TURNSTILE_EXPECTED_HOSTNAME: "",
+};
 const types = {
   ".html": "text/html; charset=utf-8",
   ".css": "text/css; charset=utf-8",
@@ -50,7 +62,7 @@ http
         });
         const response = await handleApi(
           request,
-          db,
+          localRuntime,
           undefined,
           scoped ? "/project_sixth/" : "/",
         );

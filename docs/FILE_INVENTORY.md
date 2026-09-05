@@ -150,3 +150,13 @@
 ## v0.4.2で追加
 
 - `tests/economy.test.mjs` — カード、粒子、戦闘5回の活動報酬が合計100 RCになることと、開始済み戦闘の新報酬への移行を検証。
+
+
+## v0.5.0で追加
+
+- `docs/PREDICTION_BETTING.md` — RC投票、オッズ、払戻、XP、Turnstile、staging/production rolloutの正本。
+- `migrations/0002_prediction_betting.sql` — bet、pool、market snapshot、RC/XP ledger。
+- `worker/prediction-betting.js` — stake検証、Turnstile、rate limit、pool再集計、final snapshot、lazy settlement。
+- `js/turnstile.js` — Turnstile client scriptの遅延読み込み。
+- `tests/prediction-betting.test.mjs` — 無料10 RC、uncapped payout、8x XP cap、MISS、二重settlementを検証。
+- 既存 `worker/api.js`, `worker/game.js`, `js/app.js`, `css/screens.css`, `shared/config.js`, `wrangler.jsonc` をRC market対応へ更新。

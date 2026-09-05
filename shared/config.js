@@ -1,5 +1,5 @@
 export const config = Object.freeze({
-  gameVersion: "0.4.2",
+  gameVersion: "0.5.0",
   testVersion: 1,
   particleRuleVersion: 5,
   battleCoreVersion: 1,
@@ -29,6 +29,19 @@ export const config = Object.freeze({
     drawCost: 100,
     tenDrawCost: 900,
     duplicateShards: 10,
+  },
+  predictionBetting: {
+    minStakeRC: 10,
+    maxStakeRC: 1000,
+    stakeStepRC: 10,
+    freeStakeRC: 10,
+    houseEdge: 0,
+    hitBaseXP: 20,
+    xpOddsLog2Multiplier: 10,
+    xpOddsCap: 8,
+    // Future tuning: raise this to 16 once participation is large enough for
+    // long-shot market odds to be statistically meaningful.
+    // xpOddsCap: 16,
   },
   battle: {
     dailyLimit: 5,

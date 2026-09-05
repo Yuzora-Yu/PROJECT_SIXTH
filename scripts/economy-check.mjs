@@ -24,6 +24,9 @@ const testTotal = Object.values(config.economy.dailyTestRC).reduce(
 console.log(
   `Daily tests: ${testTotal} RC/day (${config.economy.dailyTestRC.card} card + ${config.economy.dailyTestRC.particle} particle). Battles: ${battleTotal} RC/day (${config.battle.completionRC} x ${config.battle.dailyLimit}). Activities total: ${activityTotal} RC/day. Access bonus: ${config.economy.dailyAccessRC} RC/day. Single summon: ${config.economy.drawCost} RC; ten summons: ${config.economy.tenDrawCost} RC. No training rewards.`,
 );
+console.log(
+  `Prediction markets: ${config.predictionBetting.minStakeRC}-${config.predictionBetting.maxStakeRC} RC in ${config.predictionBetting.stakeStepRC} RC steps; first ${config.predictionBetting.freeStakeRC} RC per prediction version is free and participates in payout; no explicit house take; XP odds cap ${config.predictionBetting.xpOddsCap}x. The free stake can mint up to ${config.predictionBetting.freeStakeRC} RC per participant/market before integer rounding when a winning pool exists.`,
+);
 if (rows.some((r) => r.winRate < 0.3))
   throw new Error("A starting character wins fewer than 30% of trials.");
 if (rows.some((r) => r.rewardMismatches))
@@ -36,3 +39,14 @@ if (
   activityTotal !== 100
 )
   throw new Error("Daily activity rewards must total exactly 100 RC.");
+
+if (
+  config.predictionBetting.minStakeRC !== 10 ||
+  config.predictionBetting.maxStakeRC !== 1000 ||
+  config.predictionBetting.stakeStepRC !== 10 ||
+  config.predictionBetting.freeStakeRC !== 10 ||
+  config.predictionBetting.houseEdge !== 0 ||
+  config.predictionBetting.hitBaseXP !== 20 ||
+  config.predictionBetting.xpOddsCap !== 8
+)
+  throw new Error("Prediction betting economy contract changed unexpectedly.");

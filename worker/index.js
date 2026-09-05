@@ -13,7 +13,7 @@ export default {
     if (url.pathname.startsWith("/api/"))
       return handleApi(
         normalized,
-        env.DB,
+        env,
         undefined,
         scoped ? prefix + "/" : "/",
       );
