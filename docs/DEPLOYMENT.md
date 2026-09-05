@@ -30,7 +30,7 @@
 
 今後もWorkers・D1などの無料枠内で運用し、ドメイン料を除く追加料金が必要になる操作は実行前に停止します。利用量と仕様はCloudflareの[Workers料金](https://developers.cloudflare.com/workers/platform/pricing/)および[D1料金](https://developers.cloudflare.com/d1/platform/pricing/)の公式情報で確認します。
 
-GitHub Pagesは使用しません。GitHub Actionsは検証のみで、自動デプロイ用トークンは設定していません。
+GitHub Pagesは使用しません。通常のアプリ更新は手動配信とし、公開承認と公開時刻を満たす現実予測カタログだけを専用GitHub Actionsで既存Workerへ自動反映します。Cloudflare tokenは対象accountと `yu-zora.com` zoneへ限定しています。
 
 ## 更新手順
 

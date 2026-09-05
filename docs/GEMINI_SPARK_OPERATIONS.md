@@ -1,7 +1,7 @@
 # Gemini Spark 運用仕様 — Reality Prediction Ops
 
 確認日: 2026-09-04  
-対象: PROJECT SIXTH 現実予測運用  /  release 2.1.0  /  schema 2.0.0
+対象: PROJECT SIXTH 現実予測運用 / release 2.1.0 / schema 2.0.0
 
 ## 1. この文書の目的
 
@@ -106,15 +106,15 @@ T01/T02 が有用な新規サイトを発見しても、直接 `SOURCE_MASTER` �
 
 ## 4. 7 Skills / 7 Tasks
 
-| Task | Skill | 役割 | 毎時予定 |
-|---|---|---|---|
-| T01 | `collect-prediction-candidates` | 問題案収集 | :00 |
-| T02 | `draft-prediction-question` | 選定・加筆・選択肢・解決ルール | :15 |
-| T03 | `audit-prediction-question` | 公開前独立監査 + source候補検証 | :30 |
-| T04 | `approve-prediction-publication` | 公開最終判定 | :45 |
-| T05 | `verify-prediction-result-primary` | 結果確認1 | :00 |
-| T06 | `verify-prediction-result-secondary` | 結果確認2 | :15 |
-| T07 | `settle-prediction-result` | 二重確認の監査・最終確定 | :30 |
+| Task | Skill                                | 役割                            | 毎時予定 |
+| ---- | ------------------------------------ | ------------------------------- | -------- |
+| T01  | `collect-prediction-candidates`      | 問題案収集                      | :00      |
+| T02  | `draft-prediction-question`          | 選定・加筆・選択肢・解決ルール  | :15      |
+| T03  | `audit-prediction-question`          | 公開前独立監査 + source候補検証 | :30      |
+| T04  | `approve-prediction-publication`     | 公開最終判定                    | :45      |
+| T05  | `verify-prediction-result-primary`   | 結果確認1                       | :00      |
+| T06  | `verify-prediction-result-secondary` | 結果確認2                       | :15      |
+| T07  | `settle-prediction-result`           | 二重確認の監査・最終確定        | :30      |
 
 同じ時刻のTask同士にも順序依存はない。`status` / `gate` だけを工程順の根拠にする。
 
@@ -148,7 +148,7 @@ Google Drive へアップロードし Google Sheets へ変換して使用する�
 
 ## 6. GitHub Actions との境界
 
-現時点では予測 Actions は実装しない。まず Sheet bridge の認証方式と報酬仕様を確定する。
+Action 1はGoogle OIDCと専用サービスアカウントを使うSheet bridgeとして実装済み。Action 2は報酬仕様が確定するまで実装しない。設定と初回確認は `PREDICTION_AUTOMATION.md` を正とする。
 
 ### Action 1
 
@@ -179,19 +179,19 @@ Google Drive へアップロードし Google Sheets へ変換して使用する�
 
 `reward_policy_id=TBD` の間は報酬量を生成AIに作らせない。
 
-## 7. Sheet bridge の PoC が最優先
+## 7. Sheet bridge の確認結果
 
-Spark の共有 Sheet 編集に確認が入る可能性があるため、次の実装前に小さな PoC を行う。
+個人所有Sheetを専用サービスアカウントへ共有し、GitHub OIDCから短時間だけ借用する方式を採用した。JSON鍵、個人OAuth refresh token、OAuth client secretは使用しない。
 
-確認すること:
+Action 1は次を検証する:
 
-1. Spark scheduled task が個人所有 Sheet を無人更新できるか
-2. GitHub Actions 側から同じ Sheet を安全に読み取れる方式
-3. bridge 用の認証情報を Sheet / repository / Spark thread に露出しないこと
-4. Action 実行後に Sheet へ状態更新できること
-5. 同じ idempotency key の再送が NOOP になること
+1. GitHub Actionsから固定Sheetだけを読み書きできること
+2. bridge用の認証情報をSheet、repository、Spark taskへ露出しないこと
+3. 本番APIで公開済みのkeyだけをSheetへ確定記録すること
+4. 同じidempotency keyの再送がNOOPになること
+5. 状態競合時はSheetへ書き込まないこと
 
-共有 Sheet + service account が確認動作を誘発するなら、個人 OAuth 等の方式を検討する。認証方式は PoC 結果を見て固定し、推測で決めない。
+対象Sheetにはサービスアカウントを編集者として登録済み。attribute conditionはrepository ID、owner ID、branch、この公開workflow、schedule/workflow_dispatchへ限定している。
 
 ## 8. 引き継ぎ時の絶対ルール
 
@@ -203,7 +203,6 @@ Spark の共有 Sheet 編集に確認が入る可能性があるため、次の�
 - 既存 audit を削除しない。
 - 本番ユーザーのアクセスを Spark / LLM の可用性に依存させない。
 - 報酬・経済値を Gemini に創作させない。
-
 
 ## 固定Spreadsheet（release 2.1.0）
 

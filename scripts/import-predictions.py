@@ -23,6 +23,8 @@ CONTRACT_ID = "PROJECT_SIXTH_PREDICTION_OPS"
 SCHEMA_VERSION = "2.0.0"
 TIMEZONE_NAME = "Asia/Tokyo"
 JST = timezone(timedelta(hours=9))
+SPREADSHEET_ID = "1ZGb__FQT25BPkzovq2UTfO4clvE7G71PiRm3yywSj6Y"
+MAX_APPROVED_KEYS = 6
 
 MAIN_NS = "http://schemas.openxmlformats.org/spreadsheetml/2006/main"
 OFFICE_REL_NS = (
@@ -101,6 +103,7 @@ PREDICTION_HEADERS = frozenset(
 )
 
 ID_RE = re.compile(r"^PRED-\d{8}-\d{3}$")
+TOKEN_RE = re.compile(r"^[0-9a-f]{64}$")
 RELEASE_RE = re.compile(r"^(\d+)\.(\d+)\.(\d+)$")
 NUMERIC_RE = re.compile(r"^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$")
 URL_BODY = r"[A-Za-z0-9._~:/?#\[\]@!$&*+,;=%\-]+"
@@ -139,6 +142,28 @@ class ImportFailure(Exception):
 
 def fail(message: str) -> None:
     raise ImportFailure(message)
+
+
+def timezone_iso_datetime(value: str, description: str) -> datetime:
+    if not isinstance(value, str) or not value.strip():
+        fail(f"{description} must be an ISO date-time with a timezone")
+    normalized = value.strip()
+    if normalized.endswith("Z"):
+        normalized = normalized[:-1] + "+00:00"
+    try:
+        parsed = datetime.fromisoformat(normalized)
+    except ValueError:
+        fail(f"{description} must be an ISO date-time with a timezone")
+    if parsed.tzinfo is None:
+        fail(f"{description} must include a timezone")
+    return parsed.astimezone(JST)
+
+
+def cli_as_of(value: str) -> datetime:
+    try:
+        return timezone_iso_datetime(value, "--as-of")
+    except ImportFailure as error:
+        raise argparse.ArgumentTypeError(str(error)) from None
 
 
 def cell_text(value: str | None) -> str:
@@ -448,7 +473,7 @@ def validate_https_url(raw_value: str, description: str) -> str:
         parsed = urlsplit(value)
         port = parsed.port
     except ValueError:
-        fail(f"{description} is not a valid HTTPS URL: {value!r}")
+        fail(f"{description} is not a valid HTTPS URL")
     if (
         any(character.isspace() for character in value)
         or any(ord(character) < 32 for character in value)
@@ -458,7 +483,7 @@ def validate_https_url(raw_value: str, description: str) -> str:
         or parsed.password is not None
         or port is not None and not (1 <= port <= 65535)
     ):
-        fail(f"{description} is not a valid HTTPS URL: {value!r}")
+        fail(f"{description} is not a valid HTTPS URL")
     return value
 
 
@@ -678,6 +703,7 @@ def read_predictions(
     workbook: Workbook,
     sources: dict[str, dict[str, str]],
     as_of_jst: datetime,
+    approved_keys: set[str] | None = None,
 ) -> tuple[list[dict[str, Any]], set[str]]:
     rows = workbook.rows("06_PREDICTIONS")
     header_row, headers = find_headers(
@@ -685,6 +711,7 @@ def read_predictions(
     )
     selected: list[dict[str, Any]] = []
     keys: dict[str, int] = {}
+    matched_approved_keys: set[str] = set()
     unpublished_withdrawals: set[str] = set()
 
     for row_number, row in rows:
@@ -770,9 +797,14 @@ def read_predictions(
             item = public_prediction(
                 record, row_number, version, sources, workbook.date_1904
             )
-            include = approved_prediction_is_due(
+            is_due = approved_prediction_is_due(
                 datetime.fromisoformat(item["publishAt"]), as_of_jst
             )
+            include = is_due and (
+                approved_keys is None or key in approved_keys
+            )
+            if include and approved_keys is not None:
+                matched_approved_keys.add(key)
         if include:
             if item is None:
                 item = public_prediction(
@@ -794,6 +826,13 @@ def read_predictions(
             # publication/result evidence makes an apparent regression non-removable.
             unpublished_withdrawals.add(key)
 
+    if approved_keys is not None:
+        unmatched = sorted(approved_keys.difference(matched_approved_keys))
+        if unmatched:
+            fail(
+                "approved publication plan key does not match a due "
+                f"APPROVED_FOR_PUBLISH row: {unmatched[0]}"
+            )
     selected.sort(key=lambda item: (item["id"], item["version"]))
     return selected, unpublished_withdrawals
 
@@ -940,9 +979,122 @@ def write_atomic(path: Path, content: str) -> None:
                 pass
 
 
+def load_approved_plan(path: Path) -> tuple[set[str], datetime]:
+    try:
+        plan = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+        fail("cannot read approved publication plan JSON")
+    if not isinstance(plan, dict):
+        fail("approved publication plan must be a JSON object")
+    if (
+        not isinstance(plan.get("plan_version"), int)
+        or isinstance(plan.get("plan_version"), bool)
+        or plan["plan_version"] != 1
+    ):
+        fail("approved publication plan version is unsupported")
+    if plan.get("spreadsheet_id") != SPREADSHEET_ID:
+        fail("approved publication plan targets a different spreadsheet")
+    if (
+        plan.get("contract_id") != CONTRACT_ID
+        or plan.get("schema_version") != SCHEMA_VERSION
+    ):
+        fail("approved publication plan contract does not match")
+    if not isinstance(plan.get("release_version"), str) or not RELEASE_RE.fullmatch(
+        plan["release_version"]
+    ):
+        fail("approved publication plan release version is invalid")
+    snapshot_fingerprint = plan.get("snapshot_fingerprint")
+    if not isinstance(snapshot_fingerprint, str) or not TOKEN_RE.fullmatch(
+        snapshot_fingerprint
+    ):
+        fail("approved publication plan fingerprint is invalid")
+    as_of_jst = timezone_iso_datetime(
+        plan.get("as_of_jst"), "approved publication plan as_of_jst"
+    )
+    items = plan.get("items")
+    if not isinstance(items, list) or len(items) > MAX_APPROVED_KEYS:
+        fail("approved publication plan items are invalid")
+    if not isinstance(plan.get("noop"), bool) or plan["noop"] != (not items):
+        fail("approved publication plan no-op state is invalid")
+    deferred_count = plan.get("deferred_count")
+    if (
+        not isinstance(deferred_count, int)
+        or isinstance(deferred_count, bool)
+        or deferred_count < 0
+    ):
+        fail("approved publication plan deferred count is invalid")
+    if deferred_count and len(items) != MAX_APPROVED_KEYS:
+        fail("approved publication plan deferred count is inconsistent")
+    counts = plan.get("counts")
+    count_names = ("ready_due", "selected", "deferred")
+    if (
+        not isinstance(counts, dict)
+        or any(
+            not isinstance(counts.get(name), int)
+            or isinstance(counts.get(name), bool)
+            or counts[name] < 0
+            for name in count_names
+        )
+        or counts.get("selected") != len(items)
+        or counts.get("deferred") != deferred_count
+        or counts.get("ready_due") != len(items) + deferred_count
+    ):
+        fail("approved publication plan counts are inconsistent")
+
+    expected_fields = {
+        "row_number",
+        "prediction_id",
+        "version",
+        "key",
+        "expected_status",
+        "expected_publish_gate",
+        "publish_at_jst",
+        "state_token",
+    }
+    approved_keys: set[str] = set()
+    order: list[tuple[datetime, str, int]] = []
+    for item in items:
+        if not isinstance(item, dict) or set(item) != expected_fields:
+            fail("approved publication plan contains an invalid item")
+        prediction_id = item["prediction_id"]
+        version = item["version"]
+        key = item["key"]
+        if (
+            not isinstance(prediction_id, str)
+            or not ID_RE.fullmatch(prediction_id)
+            or not isinstance(version, int)
+            or isinstance(version, bool)
+            or version < 1
+            or key != f"{prediction_id}|{version}"
+            or key in approved_keys
+        ):
+            fail("approved publication plan contains an invalid key")
+        if (
+            item["expected_status"] != PUBLISHABLE_STATUS
+            or item["expected_publish_gate"] != "READY"
+            or not isinstance(item["row_number"], int)
+            or isinstance(item["row_number"], bool)
+            or item["row_number"] < 4
+            or not isinstance(item["state_token"], str)
+            or not TOKEN_RE.fullmatch(item["state_token"])
+        ):
+            fail("approved publication plan contains an invalid expected state")
+        publish_at = timezone_iso_datetime(
+            item["publish_at_jst"], "approved publication plan publish_at_jst"
+        )
+        if publish_at > as_of_jst:
+            fail("approved publication plan contains a future item")
+        approved_keys.add(key)
+        order.append((publish_at, prediction_id, version))
+    if order != sorted(order):
+        fail("approved publication plan items are not in stable order")
+    return approved_keys, as_of_jst
+
+
 def build(
     workbook_path: Path,
     as_of_jst: datetime | None = None,
+    approved_keys: set[str] | None = None,
 ) -> tuple[dict[str, str], list[dict[str, Any]], set[str]]:
     if as_of_jst is None:
         as_of_jst = datetime.now(JST)
@@ -954,7 +1106,7 @@ def build(
         config = read_config(workbook)
         sources = read_sources(workbook)
         catalog, unpublished_withdrawals = read_predictions(
-            workbook, sources, as_of_jst
+            workbook, sources, as_of_jst, approved_keys
         )
     metadata = {
         "contractId": CONTRACT_ID,
@@ -976,6 +1128,16 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         help=f"input XLSX (default: {DEFAULT_WORKBOOK})",
     )
     parser.add_argument(
+        "--as-of",
+        type=cli_as_of,
+        help="catalog cutoff as an ISO date-time with an explicit timezone",
+    )
+    parser.add_argument(
+        "--approved-keys-file",
+        type=Path,
+        help="publication plan JSON whose selected APPROVED rows may be exported",
+    )
+    parser.add_argument(
         "--check",
         action="store_true",
         help="fail if the generated catalog is absent or differs",
@@ -986,7 +1148,23 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
 def run(argv: list[str]) -> int:
     arguments = parse_args(argv)
     workbook_path = arguments.workbook.expanduser().resolve()
-    metadata, catalog, unpublished_withdrawals = build(workbook_path)
+    approved_keys: set[str] | None = None
+    plan_as_of: datetime | None = None
+    if arguments.approved_keys_file is not None:
+        approved_keys, plan_as_of = load_approved_plan(
+            arguments.approved_keys_file.expanduser().resolve()
+        )
+    as_of_jst = arguments.as_of or plan_as_of
+    if (
+        arguments.as_of is not None
+        and plan_as_of is not None
+        and arguments.as_of.astimezone(timezone.utc)
+        != plan_as_of.astimezone(timezone.utc)
+    ):
+        fail("--as-of does not match approved publication plan as_of_jst")
+    metadata, catalog, unpublished_withdrawals = build(
+        workbook_path, as_of_jst, approved_keys
+    )
     protect_existing_history(
         OUTPUT_PATH, metadata, catalog, unpublished_withdrawals
     )

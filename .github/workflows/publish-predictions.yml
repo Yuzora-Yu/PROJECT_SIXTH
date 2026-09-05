@@ -1,0 +1,535 @@
+name: Publish approved predictions
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Read and validate the Sheet without publishing or writing back
+        required: true
+        default: true
+        type: boolean
+  schedule:
+    # Spark runs at :00, :15, :30 and :45 JST. UTC has the same minute value.
+    - cron: "55 * * * *"
+
+permissions:
+  contents: write
+  id-token: write
+
+concurrency:
+  group: prediction-publication
+  cancel-in-progress: false
+
+env:
+  DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run || false }}
+  PREDICTION_SPREADSHEET_ID: ${{ vars.GOOGLE_SPREADSHEET_ID || secrets.GOOGLE_SPREADSHEET_ID }}
+  PUBLIC_API_BASE: https://yu-zora.com/project_sixth/api
+  PUBLIC_PAGE_URL: https://yu-zora.com/project_sixth/#prediction
+
+jobs:
+  publish:
+    if: >-
+      github.repository == 'Yuzora-Yu/PROJECT_SIXTH' &&
+      github.ref == 'refs/heads/yuzora/mvp-foundation'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Validate workflow configuration
+        env:
+          GCP_WIF_PROVIDER: ${{ vars.GCP_WIF_PROVIDER }}
+          GCP_SERVICE_ACCOUNT: ${{ vars.GCP_SERVICE_ACCOUNT }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          for name in GCP_WIF_PROVIDER GCP_SERVICE_ACCOUNT PREDICTION_SPREADSHEET_ID; do
+            if [ -z "${!name:-}" ]; then
+              echo "::error::Required Google configuration is missing: ${name}"
+              exit 1
+            fi
+          done
+          if [ "$DRY_RUN" != "true" ]; then
+            for name in CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID; do
+              if [ -z "${!name:-}" ]; then
+                echo "::error::Required Cloudflare configuration is missing: ${name}"
+                exit 1
+              fi
+            done
+          fi
+
+      - name: Check out the publication branch
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.13"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "24"
+          cache: npm
+
+      - name: Install Node.js dependencies
+        run: npm ci
+
+      - name: Verify Cloudflare API access for the initial publish run
+        if: github.event_name == 'workflow_dispatch' && env.DRY_RUN == 'false'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --output /dev/null \
+            --header "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            https://api.cloudflare.com/client/v4/user/tokens/verify
+          curl --fail --silent --show-error --output /dev/null \
+            --header "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts/project-sixth/settings"
+
+      - id: google-auth
+        name: Authenticate to Google without a service-account key
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3
+        with:
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_SERVICE_ACCOUNT }}
+          token_format: access_token
+          access_token_lifetime: 3600s
+          access_token_scopes: |-
+            https://www.googleapis.com/auth/drive.readonly
+            https://www.googleapis.com/auth/spreadsheets
+          create_credentials_file: false
+
+      - name: Capture the initial live publication plan
+        env:
+          GHA_GOOGLE_ACCESS_TOKEN: ${{ steps.google-auth.outputs.access_token }}
+        run: >-
+          python scripts/google-sheets-bridge.py
+          --spreadsheet-id "$PREDICTION_SPREADSHEET_ID"
+          plan
+          --output "$RUNNER_TEMP/initial-plan.json"
+          > /dev/null
+
+      - id: plan
+        name: Fix the publication time and count
+        env:
+          PLAN_PATH: ${{ runner.temp }}/initial-plan.json
+        run: |
+          python - <<'PY' >> "$GITHUB_OUTPUT"
+          import json
+          import os
+          from datetime import datetime
+          from pathlib import Path
+
+          plan = json.loads(Path(os.environ["PLAN_PATH"]).read_text(encoding="utf-8"))
+          items = plan.get("items")
+          if not isinstance(items, list):
+              raise SystemExit("publication plan has no items array")
+          as_of = plan.get("as_of_jst")
+          if not isinstance(as_of, str):
+              raise SystemExit("publication plan has no as_of_jst")
+          try:
+              parsed = datetime.fromisoformat(as_of)
+          except ValueError:
+              raise SystemExit("publication plan has an invalid as_of_jst") from None
+          if parsed.tzinfo is None or parsed.isoformat(timespec="seconds") != as_of:
+              raise SystemExit("publication plan has a non-canonical as_of_jst")
+          print(f"count={len(items)}")
+          print(f"as_of_jst={as_of}")
+          PY
+
+      - name: Export the canonical Sheet
+        env:
+          GHA_GOOGLE_ACCESS_TOKEN: ${{ steps.google-auth.outputs.access_token }}
+        run: >-
+          python scripts/google-sheets-bridge.py
+          --spreadsheet-id "$PREDICTION_SPREADSHEET_ID"
+          export
+          --output "$RUNNER_TEMP/prediction-ops.xlsx"
+
+      - name: Re-read the live plan at the fixed time
+        env:
+          GHA_GOOGLE_ACCESS_TOKEN: ${{ steps.google-auth.outputs.access_token }}
+        run: >-
+          python scripts/google-sheets-bridge.py
+          --spreadsheet-id "$PREDICTION_SPREADSHEET_ID"
+          plan
+          --as-of "${{ steps.plan.outputs.as_of_jst }}"
+          --output "$RUNNER_TEMP/publication-plan.json"
+          > /dev/null
+
+      - name: Verify the Sheet did not change during export
+        env:
+          INITIAL_PLAN_PATH: ${{ runner.temp }}/initial-plan.json
+          PUBLICATION_PLAN_PATH: ${{ runner.temp }}/publication-plan.json
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          initial = json.loads(
+              Path(os.environ["INITIAL_PLAN_PATH"]).read_text(encoding="utf-8")
+          )
+          publication = json.loads(
+              Path(os.environ["PUBLICATION_PLAN_PATH"]).read_text(encoding="utf-8")
+          )
+          for field in ("snapshot_fingerprint", "items", "counts"):
+              if initial.get(field) != publication.get(field):
+                  raise SystemExit("live publication state changed during Sheet export")
+          if initial.get("as_of_jst") != publication.get("as_of_jst"):
+              raise SystemExit("publication plans use different as_of_jst values")
+          print("live publication snapshots match")
+          PY
+
+      - name: Generate and check the public catalog
+        run: |
+          cp worker/prediction-catalog.generated.js "$RUNNER_TEMP/prediction-catalog.before.js"
+          python scripts/import-predictions.py "$RUNNER_TEMP/prediction-ops.xlsx" --as-of "${{ steps.plan.outputs.as_of_jst }}" --approved-keys-file "$RUNNER_TEMP/publication-plan.json"
+          python scripts/import-predictions.py "$RUNNER_TEMP/prediction-ops.xlsx" --as-of "${{ steps.plan.outputs.as_of_jst }}" --approved-keys-file "$RUNNER_TEMP/publication-plan.json" --check
+
+      - name: Reject catalog changes outside the publication plan
+        env:
+          BEFORE_CATALOG_PATH: ${{ runner.temp }}/prediction-catalog.before.js
+          AFTER_CATALOG_PATH: worker/prediction-catalog.generated.js
+          PUBLICATION_PLAN_PATH: ${{ runner.temp }}/publication-plan.json
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          import re
+          from pathlib import Path
+
+          def read_assignment(path, name):
+              text = Path(path).read_text(encoding="utf-8")
+              marker = f"export const {name} = Object.freeze("
+              if text.count(marker) != 1:
+                  raise SystemExit("prediction catalog has an invalid assignment")
+              start = text.index(marker) + len(marker)
+              try:
+                  value, end = json.JSONDecoder().raw_decode(text, start)
+              except json.JSONDecodeError:
+                  raise SystemExit("prediction catalog contains invalid JSON") from None
+              if not re.match(r"\s*\);", text[end:]):
+                  raise SystemExit("prediction catalog has an invalid terminator")
+              return value
+
+          def keyed(items, label):
+              if not isinstance(items, list):
+                  raise SystemExit(f"{label} catalog is not an array")
+              result = {}
+              for item in items:
+                  if not isinstance(item, dict):
+                      raise SystemExit(f"{label} catalog contains a non-object")
+                  prediction_id = item.get("id")
+                  version = item.get("version")
+                  if (
+                      not isinstance(prediction_id, str)
+                      or not re.fullmatch(r"PRED-\d{8}-\d{3}", prediction_id)
+                      or not isinstance(version, int)
+                      or isinstance(version, bool)
+                      or version < 1
+                  ):
+                      raise SystemExit(f"{label} catalog contains an invalid key")
+                  key = f"{prediction_id}|{version}"
+                  if key in result:
+                      raise SystemExit(f"{label} catalog contains a duplicate key")
+                  result[key] = item
+              return result
+
+          def canonical(value):
+              return json.dumps(
+                  value,
+                  ensure_ascii=False,
+                  sort_keys=True,
+                  separators=(",", ":"),
+              )
+
+          before_path = os.environ["BEFORE_CATALOG_PATH"]
+          after_path = os.environ["AFTER_CATALOG_PATH"]
+          plan = json.loads(
+              Path(os.environ["PUBLICATION_PLAN_PATH"]).read_text(encoding="utf-8")
+          )
+          planned_items = plan.get("items")
+          if not isinstance(planned_items, list):
+              raise SystemExit("publication plan has no items array")
+          planned_keys = set()
+          for item in planned_items:
+              key = item.get("key") if isinstance(item, dict) else None
+              if not isinstance(key, str) or not re.fullmatch(
+                  r"PRED-\d{8}-\d{3}\|[1-9]\d*", key
+              ):
+                  raise SystemExit("publication plan contains an invalid key")
+              if key in planned_keys:
+                  raise SystemExit("publication plan contains a duplicate key")
+              planned_keys.add(key)
+
+          before = keyed(read_assignment(before_path, "rawPredictionCatalog"), "old")
+          after = keyed(read_assignment(after_path, "rawPredictionCatalog"), "new")
+          removed = set(before) - set(after)
+          if removed:
+              raise SystemExit("catalog generation removed an existing prediction")
+          for key, old_item in before.items():
+              if canonical(old_item) != canonical(after[key]):
+                  raise SystemExit("catalog generation changed an existing prediction")
+          added = set(after) - set(before)
+          if added != planned_keys - set(before):
+              raise SystemExit("catalog additions do not match the publication plan")
+          if not planned_keys <= set(after):
+              raise SystemExit("the generated catalog is missing a planned prediction")
+
+          release = read_assignment(after_path, "predictionCatalogRelease")
+          expected_release = {
+              "contractId": plan.get("contract_id"),
+              "schemaVersion": plan.get("schema_version"),
+              "releaseVersion": plan.get("release_version"),
+          }
+          if canonical(release) != canonical(expected_release):
+              raise SystemExit("catalog release metadata does not match the live plan")
+          print(
+              f"catalog scope verified: {len(before)} retained, {len(added)} added"
+          )
+          PY
+
+      - name: Run the repository checks
+        run: |
+          npm run check
+          node scripts/economy-check.mjs
+          npm run deploy:check
+
+      - name: Reject an unexplained catalog change
+        if: steps.plan.outputs.count == '0'
+        run: |
+          if ! git diff --quiet -- worker/prediction-catalog.generated.js; then
+            echo "::error::The catalog changed even though the publication plan is empty."
+            exit 1
+          fi
+
+      - name: Re-read the live plan before publication
+        env:
+          GHA_GOOGLE_ACCESS_TOKEN: ${{ steps.google-auth.outputs.access_token }}
+        run: >-
+          python scripts/google-sheets-bridge.py
+          --spreadsheet-id "$PREDICTION_SPREADSHEET_ID"
+          plan
+          --as-of "${{ steps.plan.outputs.as_of_jst }}"
+          --output "$RUNNER_TEMP/predeploy-plan.json"
+          > /dev/null
+
+      - name: Verify the live state before publication
+        env:
+          PUBLICATION_PLAN_PATH: ${{ runner.temp }}/publication-plan.json
+          PREDEPLOY_PLAN_PATH: ${{ runner.temp }}/predeploy-plan.json
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          publication = json.loads(
+              Path(os.environ["PUBLICATION_PLAN_PATH"]).read_text(encoding="utf-8")
+          )
+          predeploy = json.loads(
+              Path(os.environ["PREDEPLOY_PLAN_PATH"]).read_text(encoding="utf-8")
+          )
+          for field in ("snapshot_fingerprint", "items"):
+              if publication.get(field) != predeploy.get(field):
+                  raise SystemExit("live publication state changed before deployment")
+          if publication.get("as_of_jst") != predeploy.get("as_of_jst"):
+              raise SystemExit("pre-deployment plan uses a different as_of_jst")
+          print("pre-deployment publication snapshot matches")
+          PY
+
+      - id: revision
+        name: Commit the generated catalog
+        if: env.DRY_RUN == 'false' && steps.plan.outputs.count != '0'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          unexpected="$(git status --porcelain --untracked-files=all | grep -vE '^ M worker/prediction-catalog\.generated\.js$' || true)"
+          if [ -n "$unexpected" ]; then
+            echo "::error::Unexpected files changed while generating the catalog."
+            exit 1
+          fi
+          git diff --check
+          if ! git diff --quiet -- worker/prediction-catalog.generated.js; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add worker/prediction-catalog.generated.js
+            git commit -m "chore(predictions): publish ${{ steps.plan.outputs.count }} approved entries"
+            auth_header="$(printf 'x-access-token:%s' "$GITHUB_TOKEN" | base64 -w 0)"
+            git -c http.https://github.com/.extraheader="AUTHORIZATION: basic $auth_header" push origin "HEAD:${GITHUB_REF_NAME}"
+            unset auth_header
+          fi
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Deploy the verified catalog to Cloudflare
+        if: env.DRY_RUN == 'false' && steps.plan.outputs.count != '0'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+        run: npx wrangler deploy
+
+      - name: Verify every planned key in production
+        if: env.DRY_RUN == 'false' && steps.plan.outputs.count != '0'
+        env:
+          PLAN_PATH: ${{ runner.temp }}/publication-plan.json
+          CATALOG_PATH: worker/prediction-catalog.generated.js
+          VERIFIED_KEYS_PATH: ${{ runner.temp }}/public-keys.json
+        run: |
+          python - <<'PY'
+          import http.cookiejar
+          import json
+          import os
+          import re
+          import time
+          import urllib.request
+          from pathlib import Path
+
+          plan = json.loads(Path(os.environ["PLAN_PATH"]).read_text(encoding="utf-8"))
+          expected = {str(item["key"]) for item in plan["items"]}
+          if not expected:
+              raise SystemExit("production verification received an empty plan")
+
+          catalog_text = Path(os.environ["CATALOG_PATH"]).read_text(encoding="utf-8")
+          marker = "export const rawPredictionCatalog = Object.freeze("
+          if catalog_text.count(marker) != 1:
+              raise SystemExit("generated catalog has an invalid assignment")
+          catalog_start = catalog_text.index(marker) + len(marker)
+          try:
+              raw_catalog, catalog_end = json.JSONDecoder().raw_decode(
+                  catalog_text, catalog_start
+              )
+          except json.JSONDecodeError:
+              raise SystemExit("generated catalog contains invalid JSON") from None
+          if not re.match(r"\s*\);", catalog_text[catalog_end:]):
+              raise SystemExit("generated catalog has an invalid terminator")
+          generated = {
+              f'{item["id"]}|{int(item["version"])}': item for item in raw_catalog
+          }
+          if not expected <= set(generated):
+              raise SystemExit("generated catalog is missing a planned key")
+
+          def public_core(item):
+              return {
+                  "id": item.get("id"),
+                  "version": item.get("version"),
+                  "category": item.get("category"),
+                  "horizon": item.get("horizon"),
+                  "question": item.get("question"),
+                  "choices": [choice.get("label") for choice in item.get("choices", [])],
+                  "resolutionRule": item.get("resolutionRule"),
+                  "publishAt": item.get("publishAt"),
+                  "closeAt": item.get("closeAt"),
+                  "resultDueAt": item.get("resultDueAt"),
+                  "source": item.get("source"),
+              }
+
+          def canonical(value):
+              return json.dumps(
+                  value,
+                  ensure_ascii=False,
+                  sort_keys=True,
+                  separators=(",", ":"),
+              )
+
+          cookie_jar = http.cookiejar.CookieJar()
+          opener = urllib.request.build_opener(
+              urllib.request.HTTPCookieProcessor(cookie_jar)
+          )
+          headers = {
+              "Accept": "application/json",
+              "Origin": "https://yu-zora.com",
+              "User-Agent": "PROJECT-SIXTH-Prediction-Publisher/1",
+              "X-Sixth-Client": "1",
+          }
+
+          def get_json(path):
+              request = urllib.request.Request(
+                  os.environ["PUBLIC_API_BASE"] + path,
+                  headers=headers,
+              )
+              with opener.open(request, timeout=20) as response:
+                  if response.status != 200:
+                      raise RuntimeError(f"production returned HTTP {response.status}")
+                  return json.load(response)
+
+          last_error = None
+          for attempt in range(6):
+              try:
+                  get_json("/bootstrap")
+                  break
+              except Exception as error:
+                  last_error = error
+                  if attempt == 5:
+                      raise SystemExit(f"production bootstrap failed: {last_error}")
+                  time.sleep(min(2 ** attempt, 8))
+
+          for attempt in range(6):
+              try:
+                  payload = get_json("/predictions")
+                  predictions = payload.get("predictions", {})
+                  items = predictions.get("items", [])
+                  visible = {
+                      f'{item["id"]}|{int(item["version"])}': item for item in items
+                  }
+                  if predictions.get("catalogVersion") != plan.get("release_version"):
+                      raise RuntimeError("production catalog version does not match")
+                  if set(visible) != set(generated):
+                      raise RuntimeError("production catalog key set does not match")
+                  if any(
+                      canonical(public_core(visible[key])) != canonical(generated[key])
+                      for key in expected
+                  ):
+                      raise RuntimeError("production planned content does not match")
+                  if expected <= set(visible):
+                      Path(os.environ["VERIFIED_KEYS_PATH"]).write_text(
+                          json.dumps({"keys": sorted(expected)}, ensure_ascii=False),
+                          encoding="utf-8",
+                      )
+                      print(f"verified {len(expected)} prediction key(s) in production")
+                      break
+                  last_error = RuntimeError("not all planned keys are visible")
+              except Exception as error:
+                  last_error = error
+              if attempt == 5:
+                  raise SystemExit(f"production catalog verification failed: {last_error}")
+              time.sleep(min(2 ** attempt, 8))
+          PY
+
+      - name: Mark verified predictions as published
+        if: env.DRY_RUN == 'false' && steps.plan.outputs.count != '0'
+        env:
+          GHA_GOOGLE_ACCESS_TOKEN: ${{ steps.google-auth.outputs.access_token }}
+        run: >-
+          python scripts/google-sheets-bridge.py
+          --spreadsheet-id "$PREDICTION_SPREADSHEET_ID"
+          commit-publication
+          --plan "$RUNNER_TEMP/publication-plan.json"
+          --verified-keys-file "$RUNNER_TEMP/public-keys.json"
+          --commit-url "https://github.com/$GITHUB_REPOSITORY/commit/${{ steps.revision.outputs.sha }}"
+          --public-url "$PUBLIC_PAGE_URL"
+
+      - name: Write the run summary
+        if: always()
+        run: |
+          mode="publish"
+          if [ "$DRY_RUN" = "true" ]; then
+            mode="dry run"
+          fi
+          {
+            echo "### Prediction publication"
+            echo "- Mode: $mode"
+            echo "- Planned entries: ${{ steps.plan.outputs.count || 'unavailable' }}"
+            if [ "$DRY_RUN" = "true" ]; then
+              echo "- External changes: none"
+            elif [ "${{ steps.plan.outputs.count || '0' }}" = "0" ]; then
+              echo "- Result: no eligible entries"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -1,6 +1,6 @@
 # 第六感強化計画-PROJECT SIXTH-
 
-被験者として「察知・予見・洞察・感応・共鳴」を観測し、キャラクター育成へつなぐブラウザゲーム。v0.4.0のMVPです。
+被験者として「察知・予見・洞察・感応・共鳴」を観測し、キャラクター育成へつなぐブラウザゲーム。v0.4.1のMVPです。
 
 公開先: https://yu-zora.com/project_sixth/
 
@@ -36,7 +36,7 @@ npm run dev
 
 現実予測は、運用台帳の `status=APPROVED_FOR_PUBLISH` かつ `publish_gate=READY` を満たし、公開時刻を迎えた問題だけをアプリ用カタログへ反映します。報酬・オッズ・参加率は扱わず、ユーザーアクセス時に外部AIを呼び出しません。週末共同レイドは開発中です。
 
-運用台帳の最新版をローカル専用の `ops/PROJECT_SIXTH_GeminiSpark_Prediction_Ops.xlsx` へコピーしたあと、次のコマンドで公開カタログを更新します。xlsxはGitの追跡対象外です。公開済みのID・version・問題文・選択肢・判定条件を削除または上書きする更新は拒否されます。
+手元で運用台帳を確認する場合は、最新版をローカル専用の `ops/PROJECT_SIXTH_GeminiSpark_Prediction_Ops.xlsx` へコピーし、次のコマンドで公開カタログを検証します。xlsxはGitの追跡対象外です。公開済みのID・version・問題文・選択肢・判定条件を削除または上書きする更新は拒否されます。
 
 ```powershell
 npm run predictions:import
@@ -71,7 +71,7 @@ npx wrangler d1 migrations apply project-sixth --remote
 npm run deploy
 ```
 
-Cloudflareへログイン済みの開発環境で実行します。GitHub Actionsは検証のみで、Git pushによる本番自動デプロイは設定していません。GitHub Pagesは不要です。匿名セッションCookieのPathも `/project_sixth/` に限定します。
+Cloudflareへログイン済みの開発環境では上記コマンドで手動配信できます。公開承認と公開時刻を満たす現実予測カタログは、専用GitHub Actionsが既存Workerへ自動反映します。通常のアプリ更新は自動配信しません。GitHub Pagesは不要です。匿名セッションCookieのPathも `/project_sixth/` に限定します。
 
 惑星位置の計算にはMITライセンスのAstronomy Engine 2.1.19を使用。ビルド時にブラウザ用モジュールとライセンスを `vendor/` にコピーします。出生時刻が不明なら現地正午の概算と日内の星座候補を表示し、ASC・ハウスは算出しません。
 X用ハッシュタグは `#第六感強化計画 #PROJECTSIXTH`。PNGは端末内で生成し、画像付き投稿は保存した画像をX画面で添付してください。
@@ -83,6 +83,7 @@ X用ハッシュタグは `#第六感強化計画 #PROJECTSIXTH`。PNGは端末�
 - [流用元の無変更検証](docs/PRISMA_INTEGRITY.json)
 - [実装範囲・残課題](docs/IMPLEMENTATION_NOTES.md)
 - [Gemini Spark 現実予測運用仕様](docs/GEMINI_SPARK_OPERATIONS.md)
+- [現実予測 公開自動化](docs/PREDICTION_AUTOMATION.md)
 - [現実予測 情報源ポリシー](docs/PREDICTION_SOURCE_POLICY.md)
 - [Gemini Spark Skills / Tasks](gemini-spark/README.md)
 - 現実予測 運用スプレッドシート（ローカル専用: `ops/PROJECT_SIXTH_GeminiSpark_Prediction_Ops.xlsx`）

@@ -1,11 +1,15 @@
 from __future__ import annotations
 
+import contextlib
 import importlib.util
+import io
+import json
 import tempfile
 import unittest
 import zipfile
 from datetime import datetime
 from pathlib import Path
+from unittest import mock
 from xml.sax.saxutils import escape
 
 
@@ -94,7 +98,10 @@ def prediction_record(
 
 
 def write_fixture(
-    path: Path, settled_at: str = "2026-09-05T14:30:00+09:00"
+    path: Path,
+    settled_at: str = "2026-09-05T14:30:00+09:00",
+    *,
+    extra_approved: bool = False,
 ) -> None:
     config_rows = [
         ["key", "value"],
@@ -144,6 +151,15 @@ def write_fixture(
             settled_at=settled_at,
         ),
     ]
+    if extra_approved:
+        records.append(
+            prediction_record(
+                "PRED-20260905-005",
+                "APPROVED_FOR_PUBLISH",
+                publish_gate="READY",
+                final_gate="HOLD",
+            )
+        )
     prediction_rows = [prediction_headers] + [
         [record[field] for field in prediction_headers] for record in records
     ]
@@ -174,6 +190,40 @@ def write_fixture(
         archive.writestr(
             "xl/worksheets/sheet3.xml", worksheet_xml(prediction_rows)
         )
+
+
+def publication_plan(items: list[dict[str, object]], *, as_of=None):
+    deferred = 0
+    return {
+        "plan_version": 1,
+        "spreadsheet_id": IMPORTER.SPREADSHEET_ID,
+        "contract_id": IMPORTER.CONTRACT_ID,
+        "schema_version": IMPORTER.SCHEMA_VERSION,
+        "release_version": "9.9.9",
+        "as_of_jst": as_of or "2026-09-05T12:00:00+09:00",
+        "snapshot_fingerprint": "a" * 64,
+        "noop": not items,
+        "deferred_count": deferred,
+        "counts": {
+            "ready_due": len(items) + deferred,
+            "selected": len(items),
+            "deferred": deferred,
+        },
+        "items": items,
+    }
+
+
+def plan_item(prediction_id="PRED-20260905-001", version=1):
+    return {
+        "row_number": 4,
+        "prediction_id": prediction_id,
+        "version": version,
+        "key": f"{prediction_id}|{version}",
+        "expected_status": "APPROVED_FOR_PUBLISH",
+        "expected_publish_gate": "READY",
+        "publish_at_jst": "2026-09-05T12:00:00+09:00",
+        "state_token": "b" * 64,
+    }
 
 
 class PublicationClockTests(unittest.TestCase):
@@ -228,6 +278,133 @@ class PublicationClockTests(unittest.TestCase):
             IMPORTER.build(
                 self.workbook_path, datetime(2026, 9, 5, 13, 0, 0)
             )
+
+    def test_plan_allowlist_excludes_unselected_approved_rows_only(self):
+        _, catalog, withdrawals = IMPORTER.build(
+            self.workbook_path,
+            datetime.fromisoformat("2026-09-05T12:00:00+09:00"),
+            approved_keys=set(),
+        )
+
+        self.assertEqual(
+            {item["id"] for item in catalog},
+            {
+                "PRED-20260905-002",
+                "PRED-20260905-003",
+                "PRED-20260905-004",
+            },
+        )
+        self.assertIn("PRED-20260905-001|1", withdrawals)
+
+    def test_plan_allowlist_includes_selected_due_approved_row(self):
+        write_fixture(self.workbook_path, extra_approved=True)
+        _, catalog, withdrawals = IMPORTER.build(
+            self.workbook_path,
+            datetime.fromisoformat("2026-09-05T12:00:00+09:00"),
+            approved_keys={"PRED-20260905-001|1"},
+        )
+        catalog_ids = {item["id"] for item in catalog}
+        self.assertIn("PRED-20260905-001", catalog_ids)
+        self.assertNotIn("PRED-20260905-005", catalog_ids)
+        self.assertIn("PRED-20260905-005|1", withdrawals)
+
+    def test_plan_allowlist_rejects_key_that_is_not_a_due_approved_row(self):
+        with self.assertRaisesRegex(
+            IMPORTER.ImportFailure, "does not match a due"
+        ):
+            IMPORTER.build(
+                self.workbook_path,
+                datetime.fromisoformat("2026-09-05T12:00:00+09:00"),
+                approved_keys={"PRED-20260905-999|1"},
+            )
+
+
+class ImporterCliTests(unittest.TestCase):
+    def test_as_of_cli_requires_explicit_timezone(self):
+        with contextlib.redirect_stderr(io.StringIO()):
+            with self.assertRaises(SystemExit):
+                IMPORTER.parse_args(["--as-of", "2026-09-05T12:00:00"])
+        arguments = IMPORTER.parse_args(
+            ["--as-of", "2026-09-05T03:00:00Z"]
+        )
+        self.assertEqual(
+            arguments.as_of.isoformat(timespec="seconds"),
+            "2026-09-05T12:00:00+09:00",
+        )
+
+    def test_plan_json_is_strict_and_supplies_keys_and_as_of(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "plan.json"
+            path.write_text(
+                json.dumps(publication_plan([plan_item()])), encoding="utf-8"
+            )
+            keys, as_of = IMPORTER.load_approved_plan(path)
+            self.assertEqual(keys, {"PRED-20260905-001|1"})
+            self.assertEqual(
+                as_of.isoformat(timespec="seconds"),
+                "2026-09-05T12:00:00+09:00",
+            )
+
+            malformed_item = plan_item()
+            malformed_item["question_text"] = "must never enter the plan"
+            path.write_text(
+                json.dumps(publication_plan([malformed_item])), encoding="utf-8"
+            )
+            with self.assertRaisesRegex(
+                IMPORTER.ImportFailure, "invalid item"
+            ):
+                IMPORTER.load_approved_plan(path)
+
+            numeric_hash = publication_plan([plan_item()])
+            numeric_hash["snapshot_fingerprint"] = int("1" * 64)
+            path.write_text(json.dumps(numeric_hash), encoding="utf-8")
+            with self.assertRaisesRegex(
+                IMPORTER.ImportFailure, "fingerprint"
+            ):
+                IMPORTER.load_approved_plan(path)
+
+    def test_run_passes_cli_as_of_and_plan_allowlist_to_build(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            workbook = directory / "fixture.xlsx"
+            plan_path = directory / "plan.json"
+            output = directory / "catalog.js"
+            plan_path.write_text(
+                json.dumps(publication_plan([plan_item()])), encoding="utf-8"
+            )
+            metadata = {
+                "contractId": IMPORTER.CONTRACT_ID,
+                "schemaVersion": IMPORTER.SCHEMA_VERSION,
+                "releaseVersion": "9.9.9",
+            }
+            with (
+                mock.patch.object(IMPORTER, "OUTPUT_PATH", output),
+                mock.patch.object(
+                    IMPORTER,
+                    "build",
+                    return_value=(metadata, [], set()),
+                ) as build,
+                mock.patch.object(IMPORTER, "protect_existing_history"),
+                mock.patch.object(IMPORTER, "render_catalog", return_value="catalog\n"),
+            ):
+                result = IMPORTER.run(
+                    [
+                        str(workbook),
+                        "--as-of",
+                        "2026-09-05T12:00:00+09:00",
+                        "--approved-keys-file",
+                        str(plan_path),
+                    ]
+                )
+
+            self.assertEqual(result, 0)
+            called_path, called_as_of, called_keys = build.call_args.args
+            self.assertEqual(called_path, workbook.resolve())
+            self.assertEqual(
+                called_as_of.isoformat(timespec="seconds"),
+                "2026-09-05T12:00:00+09:00",
+            )
+            self.assertEqual(called_keys, {"PRED-20260905-001|1"})
 
 
 if __name__ == "__main__":

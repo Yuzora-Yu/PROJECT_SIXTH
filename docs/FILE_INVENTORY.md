@@ -132,3 +132,10 @@
 - `worker/predictions.js` — カタログ検証、公開期間、結果状態を扱うドメイン層。
 - `tests/mobile-layout.spec.js` — 360/390pxと文字拡大時の改行・下部メニュー・横あふれを検証。
 - `tests/test_import_predictions.py` — 公開時刻境界と時刻入力を検証。
+
+## v0.4.1の公開自動化で追加
+
+- `.github/workflows/publish-predictions.yml` — 公開条件を満たす予測だけをSheetからGit、既存Worker、Sheet確定記録へ反映。
+- `scripts/google-sheets-bridge.py` — Google OIDC tokenを使う固定Sheetのexport、公開計画、atomic確定更新。
+- `tests/test_google_sheets_bridge.py` — NOOP、競合、冪等監査、限定セル更新、XLSX検査を確認。
+- `docs/PREDICTION_AUTOMATION.md` — Google Cloud、GitHub、Cloudflareの設定と運用手順。

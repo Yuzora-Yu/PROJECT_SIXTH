@@ -6,7 +6,7 @@
 
 粒子のタップ/クリック判定半径を26から36 logical px（約1.38倍）へ拡大。Dailyと訓練の共通判定へ反映。粒子ルールv2として保存し、v1で開始済みの試験は従来の判定を維持する。訓練の自己ベストと平均もルールバージョンごとに分ける。
 
-v0.4.0 / MVP。Vanilla JS ES Modules + Canvas + Workers / D1。ブランチは `yuzora/mvp-foundation`。
+v0.4.1 / MVP。Vanilla JS ES Modules + Canvas + Workers / D1。ブランチは `yuzora/mvp-foundation`。
 ユーザー指定リポジトリ・既存の配信方式を維持するため、別のSitesプロジェクトや別フレームワークへ移行していません。
 
 ## Phase別の実装
@@ -21,7 +21,7 @@ v0.4.0 / MVP。Vanilla JS ES Modules + Canvas + Workers / D1。ブランチは `
 | 5     | 30枠・初期6人選択、1回/10連、均等抽選、重複欠片、育成、所持アイコン制限、適性レーダー | キャラクター個別アクティブスキルや覚醒演出は今後                          |
 | 6     | 実測成績・XP推移・研究レーダー、数秘・天体・任意MBTI・共有                            | 出生地/血液型、ASC・ハウス、30日カレンダー集計は未実装                    |
 | 7     | 初回案内、APIエラー表示、リロード継続、記録出力、6項目スマホ下部メニュー              | 15秒粒子チュートリアル、正式な引き継ぎ/復元、実機Safari/Firefox確認は未完 |
-| 8     | release 2.2.0取込、公開ゲート通過済み6件、締切判定、D1保存・変更、結果待ち・記録表示  | SheetからGitへの自動連携と結果確定の自動配信、報酬仕様は未定義            |
+| 8     | release 2.2.0取込、公開ゲート通過済み6件、D1保存、Sheet→Git Action 1の公開自動化      | 結果確定用Action 2と報酬仕様は未実装                                      |
 
 ## 保存とセキュリティ
 
@@ -48,7 +48,7 @@ v0.4.0 / MVP。Vanilla JS ES Modules + Canvas + Workers / D1。ブランチは `
 - 訓練終了イベントで一覧を即時再描画。試験ごとに直近30件、過去最高はルールバージョン別に保存。観測記録ではDaily・訓練を併記し、粒子訓練にも再生を用意。
 - 研究記録・数秘・総合プロフィールに研究員口調の所見と共有ボタン。幅1080pxのPNGを端末内生成、X投稿画面と標準共有に対応。出生日時・被験者IDは共有画像に含めない。Xへの自動送信・画像自動アップロードは行わない。
 - 配信先は `https://yu-zora.com/project_sixth/`。専用Workerと専用D1を作成し、パス単位で接続。スラッシュなしは308、API・素材の相対パスとCookie Pathをサブフォルダへ対応。
-- GitHub PagesではAPIを実行できないため利用しない。GitHub Actionsは検証のみ、本番反映は `npm run deploy`。
+- GitHub PagesではAPIを実行できないため利用しない。通常のアプリ更新は `npm run deploy`、公開条件を満たす現実予測カタログは専用GitHub Actionsで既存Workerへ反映する。
 
 ## 既知の制約
 
@@ -68,7 +68,7 @@ v0.4.0 / MVP。Vanilla JS ES Modules + Canvas + Workers / D1。ブランチは `
 
 1. この検証版をスマホで試遊し、粒子の視認性・戦闘テンポ・研究値の伸びを調整。
 2. チュートリアルと引き継ぎ手段を仕上げ、運用バックアップとレート制限を整備。
-3. 認証済みのGoogle Sheet bridgeから、公開時刻を迎えた行だけを安全に取り込み、結果確定カタログの更新まで自動化する。
+3. 実装済みの公開用Google Sheet bridgeを運用し、結果確定用Action 2と報酬ポリシーを設計する。
 
 ## 2026-09-04 — 現実予測運用設計
 
@@ -78,7 +78,7 @@ v0.4.0 / MVP。Vanilla JS ES Modules + Canvas + Workers / D1。ブランチは `
 - 新規情報源はSOURCE_CANDIDATES → T3検証 → T4承認 → SOURCE_MASTERの順で昇格。
 - AUDIT_LOG / RUN_LOGはappend only。Git Action 1は`prediction_id|version`、Action 2は`prediction_id|version|final_result`で冪等化する。
 - 初期情報源マスター、Spark仕様、エラー方針、Git Actions入出力契約を運用xlsxへ収録。
-- Git Action 1/2、Sheet bridge、報酬ポリシーは未実装。Geminiに報酬値を創作させない。
+- Git Action 1とSheet bridgeは実装済み。Action 2と報酬ポリシーは未実装であり、Geminiに報酬値を創作させない。
 - Sparkはバックオフィス運用のみ。ユーザーアクセス時にGemini/LLMを呼び出す仕様にはしない。
 
 ## v0.3.0 — 共鳴プロフィールと研究記録

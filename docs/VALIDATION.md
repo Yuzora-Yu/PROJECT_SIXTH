@@ -3,7 +3,8 @@
 ## 自動検証
 
 - `npm test`: 34件成功。匿名セッション、同時更新、Daily、30秒粒子、戦闘、26名の公開対象、数秘・MBTI・惑星配置、初期値補正、共有、現実予測の公開期間・回答保存を確認。
-- `python -m unittest tests/test_import_predictions.py -v`: 4件成功。承認行の公開時刻境界、公開済み状態の保持、結果確定時刻、タイムゾーンなしの時刻入力拒否を確認。
+- `npm run test:predictions-import`: 10件成功。承認行の公開時刻境界、plan key許可リスト、公開済み状態の保持、結果確定時刻、タイムゾーンなしの時刻入力拒否を確認。
+- `npm run test:google-sheets-bridge`: 23件成功。live NOOP、前後snapshot、最大6件と延期、原子的なSheet確定、競合拒否、限定GET再試行を確認。
 - `npm run predictions:check`: release 2.2.0、公開対象6件で生成カタログが最新であることを確認。
 - `npm run build`: 成功。`dist/`を毎回消去してから公開素材だけを再生成し、運用xlsx・予測のWorker用カタログ・内部資料を含まないことを確認。
 - `npm run deploy:check`: Wrangler 4.129.0でWorkerと静的素材を検証。D1 `project-sixth` とASSETSの既存2 bindingだけを使用し、新規リソース作成なし。
