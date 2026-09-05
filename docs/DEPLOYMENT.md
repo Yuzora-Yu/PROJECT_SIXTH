@@ -14,19 +14,23 @@
 
 - 全画面共通フッターに「YU-ZORAトップ」「プライバシーポリシー」「利用規約」「免責事項」「お問い合わせ」の5リンクを追加しました。
 - 各リンクのタップ領域を44px以上確保し、スマホ幅でも読みやすく折り返すよう調整しました。
+- 公開承認と公開時刻を満たす現実予測を最大6件ずつ検証し、既存Workerへ反映してSheetへ書き戻す専用GitHub Actionsを追加しました。
 
 ## v0.4.1の確認結果
 
 - 公開HTMLがHTTP 200を返し、共通フッターの5リンクが含まれることを確認。
 - bootstrapがHTTP 200を返し、公開APIのversionがv0.4.1であることを確認。
+- [dry-run](https://github.com/Yuzora-Yu/PROJECT_SIXTH/actions/runs/33950745512)はcommit `9814476`から公開予定6件を検証し、Git・Cloudflare・Google Sheetへの変更なしで成功。
+- [本番公開](https://github.com/Yuzora-Yu/PROJECT_SIXTH/actions/runs/33950796966)はcommit `9814476`から6件を公開し、生成commit `a140757`の本番確認とGoogle Sheetへの原子的な書き戻しを2026-09-05 15:48:43 JSTに完了。
+- Google認証はGitHub OIDCとWorkload Identity Federationを使用し、サービスアカウントキー、OAuthクライアントシークレット、個人用refresh tokenは使用していません。
 - モバイル用Playwright: 2件中2件成功。
-- Pythonテスト: 4件中4件成功。
+- Pythonテスト: prediction importer 10件、Google Sheets bridge 24件の計34件中34件成功。
 - Nodeテスト: 34件中34件成功。
 - 本番配信用build成功。
 
 ## Cloudflareの構成と料金方針
 
-今回の配信では既存Worker、既存D1、既存静的アセット、既存ルートだけを使用しました。新しいCloudflare資源、D1 migration、有料機能、有料プラン、追加の請求設定は作成・適用していません。
+今回の手動配信とGitHub Actionsによる現実予測の公開では、既存Worker、既存D1、既存静的アセット、既存ルートだけを使用しました。新しいCloudflare資源、D1 migration、有料機能、有料プラン、追加の請求設定は作成・適用していません。
 
 今後もWorkers・D1などの無料枠内で運用し、ドメイン料を除く追加料金が必要になる操作は実行前に停止します。利用量と仕様はCloudflareの[Workers料金](https://developers.cloudflare.com/workers/platform/pricing/)および[D1料金](https://developers.cloudflare.com/d1/platform/pricing/)の公式情報で確認します。
 

@@ -4,17 +4,25 @@
 
 - `npm test`: 34件成功。匿名セッション、同時更新、Daily、30秒粒子、戦闘、26名の公開対象、数秘・MBTI・惑星配置、初期値補正、共有、現実予測の公開期間・回答保存を確認。
 - `npm run test:predictions-import`: 10件成功。承認行の公開時刻境界、plan key許可リスト、公開済み状態の保持、結果確定時刻、タイムゾーンなしの時刻入力拒否を確認。
-- `npm run test:google-sheets-bridge`: 23件成功。live NOOP、前後snapshot、最大6件と延期、原子的なSheet確定、競合拒否、限定GET再試行を確認。
-- `npm run predictions:check`: release 2.2.0、公開対象6件で生成カタログが最新であることを確認。
+- `npm run test:google-sheets-bridge`: 24件成功。live NOOP、前後snapshot、最大6件と延期、原子的なSheet確定、競合拒否、限定GET再試行、重複source_idの行番号診断を確認。
+- `npm run predictions:check`: release 2.2.0、公開対象12件で生成カタログが最新であることを確認。
 - `npm run build`: 成功。`dist/`を毎回消去してから公開素材だけを再生成し、運用xlsx・予測のWorker用カタログ・内部資料を含まないことを確認。
 - `npm run deploy:check`: Wrangler 4.129.0でWorkerと静的素材を検証。D1 `project-sixth` とASSETSの既存2 bindingだけを使用し、新規リソース作成なし。
 - `node scripts/economy-check.mjs`: 公開対象26名で戦闘を完走。Daily最大20 RC、戦闘最大50 RC、合計70 RC/日を維持。
 - `git diff --check`: 空白エラーなし。
 
+## GitHub Actions実行確認
+
+- [dry-run](https://github.com/Yuzora-Yu/PROJECT_SIXTH/actions/runs/33950745512): commit `9814476`から公開予定6件を抽出し、固定時刻での再読、公開スナップショットのfingerprint、plan許可リスト、生成カタログ、repository checksを検証。Git commit・push、Cloudflare deploy、Google Sheet書き込みを行わず成功。
+- [本番公開](https://github.com/Yuzora-Yu/PROJECT_SIXTH/actions/runs/33950796966): commit `9814476`から予定どおり6件を公開。生成commit `a140757`を既存Cloudflare Workerへ配信し、公開APIで全6件を確認後、2026-09-05 15:48:43 JSTに6件の状態更新と監査ログ追記を1回の原子的なSheet更新で完了。
+- Google認証はGitHub OIDCとWorkload Identity Federationによる短期tokenだけを使用。ワークフローにはサービスアカウントキー、OAuthクライアントシークレット、個人用refresh tokenを使用・保存していません。
+- Cloudflareは既存Workerと既存bindingだけを使用し、新しい資源、有料機能、追加の請求設定は作成していません。
+
 ## 現実予測
 
-- 運用xlsxのcontract `PROJECT_SIXTH_PREDICTION_OPS`、schema 2.0.0、release 2.2.0を検証し、公開ゲートと公開時刻を満たす6件だけを生成。
+- 運用xlsxのcontract `PROJECT_SIXTH_PREDICTION_OPS`、schema 2.0.0、release 2.2.0を検証し、公開ゲートと公開時刻を満たす項目を1実行最大6件ずつ生成。現在の公開カタログは12件。
 - 問題ID・version、2〜4択、日時順序、ACTIVE・tier A・結果確認可のHTTPS情報源を取込時に検証。
+- 予測行と参照情報源の全公開入力をfingerprintで固定し、重複source_idやplan後の状態変更を公開前に拒否。
 - 公開時刻前の承認行、候補、下書き、内部監査列を生成カタログとAPIから除外。
 - 同じID・versionの公開内容変更、公開済み履歴の削除、確定結果の差し替えを取込時に拒否。
 - 正解は `SETTLED` だけで公開し、`settled_at` が結果確認予定より前の行を拒否。
