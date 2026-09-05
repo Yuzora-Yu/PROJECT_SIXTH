@@ -1,5 +1,5 @@
 /**
- * PROJECT SIXTH - owner-only Gemini Spark Sheet bridge v1.1.0
+ * PROJECT SIXTH - owner-only Gemini Spark Sheet bridge v1.1.1
  *
  * Deploy this as a SEPARATE Apps Script Web App:
  * - Execute as: Me (the spreadsheet owner)
@@ -31,6 +31,18 @@ var ALLOWED_READ_RANGES = Object.freeze([
   "'06_PREDICTIONS'!A:AR",
   "'07_SOURCE_MASTER'!A:P",
   "'11_AUDIT_LOG'!A:P"
+]);
+
+// The publication contract is expressed as whole-column ranges on the client, but
+// the bridge must not return styled/formula-only tail rows. In particular,
+// 06_PREDICTIONS intentionally keeps AQ/AR formulas filled far below the live data.
+// Bound every read by the last non-empty identifier in column A so the response
+// size grows with actual records, not with template formatting.
+var READ_RANGE_SPECS = Object.freeze([
+  Object.freeze({sheet: '05_CONFIG', endColumn: 'C'}),
+  Object.freeze({sheet: '06_PREDICTIONS', endColumn: 'AR'}),
+  Object.freeze({sheet: '07_SOURCE_MASTER', endColumn: 'P'}),
+  Object.freeze({sheet: '11_AUDIT_LOG', endColumn: 'P'})
 ]);
 
 var REQUIRED_TABS = Object.freeze([
@@ -342,7 +354,8 @@ function batchGetValues_(ranges) {
   }
 
   var encodedId = encodeURIComponent(BRIDGE_CONFIG.TARGET_SPREADSHEET_ID);
-  var query = ranges
+  var boundedRanges = boundedPublicationReadRanges_(encodedId);
+  var query = boundedRanges
     .map(function(range) {
       return 'ranges=' + encodeURIComponent(range);
     })
@@ -368,6 +381,66 @@ function batchGetValues_(ranges) {
       return Array.isArray(valueRange.values) ? valueRange.values : [];
     })
   };
+}
+
+function boundedPublicationReadRanges_(encodedSpreadsheetId) {
+  var keyRanges = READ_RANGE_SPECS.map(function(spec) {
+    return "'" + spec.sheet + "'!A:A";
+  });
+  var keyQuery = keyRanges
+    .map(function(range) {
+      return 'ranges=' + encodeURIComponent(range);
+    })
+    .concat([
+      'majorDimension=ROWS',
+      'valueRenderOption=FORMATTED_VALUE',
+      'dateTimeRenderOption=FORMATTED_STRING'
+    ])
+    .join('&');
+  var keyResponse = fetchGoogleJson_(
+    'https://sheets.googleapis.com/v4/spreadsheets/' +
+      encodedSpreadsheetId +
+      '/values:batchGet?' +
+      keyQuery,
+    {method: 'get'},
+    'Sheets key-column read'
+  );
+  if (
+    !Array.isArray(keyResponse.valueRanges) ||
+    keyResponse.valueRanges.length !== READ_RANGE_SPECS.length
+  ) {
+    throw new Error('Sheets key-column read returned an incomplete range set');
+  }
+
+  return READ_RANGE_SPECS.map(function(spec, index) {
+    var values = keyResponse.valueRanges[index] && keyResponse.valueRanges[index].values;
+    var lastRow = lastNonEmptyFirstColumnRow_(values);
+    if (lastRow < 1) {
+      // Every contract sheet has a header row. If column A is unexpectedly empty,
+      // preserve a one-row read so downstream schema validation fails explicitly.
+      lastRow = 1;
+    }
+    return "'" + spec.sheet + "'!A1:" + spec.endColumn + lastRow;
+  });
+}
+
+function lastNonEmptyFirstColumnRow_(values) {
+  if (!Array.isArray(values)) {
+    return 0;
+  }
+  for (var index = values.length - 1; index >= 0; index -= 1) {
+    var row = values[index];
+    if (
+      Array.isArray(row) &&
+      row.length > 0 &&
+      row[0] !== null &&
+      row[0] !== undefined &&
+      String(row[0]).trim() !== ''
+    ) {
+      return index + 1;
+    }
+  }
+  return 0;
 }
 
 function batchUpdate_(requests) {
