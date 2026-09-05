@@ -2,7 +2,7 @@
 
 ## 対象
 
-GitHub Actions の `Publish approved predictions` は、固定Google Sheetで公開承認された問題をゲームへ反映する。対象はGit Action 1の公開処理であり、結果確定や報酬処理は含まない。
+GitHub Actions の `Publish approved predictions` は、固定Google Sheetで公開承認された問題をゲームへ反映する。対象はGit Action 1の公開処理であり、GitHub Actions自身はplayerのRC/XPを操作しない。最終結果がcatalogへ反映された後のRC払戻・予見XP精算はWorker/D1側が各playerの次回アクセス時に冪等実行する。
 
 正本は次のGoogle Sheetとする。
 

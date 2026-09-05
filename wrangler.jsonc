@@ -11,6 +11,11 @@
     "html_handling": "none",
     "not_found_handling": "none",
   },
+  "vars": {
+    "ENVIRONMENT": "production",
+    "TURNSTILE_SITE_KEY": "0x4AAAAAAEpWH28hrSKeDjR-",
+    "TURNSTILE_EXPECTED_HOSTNAME": "yu-zora.com",
+  },
   "d1_databases": [
     {
       "binding": "DB",
@@ -19,10 +24,53 @@
       "migrations_dir": "migrations",
     },
   ],
-  "observability": { "enabled": true, "head_sampling_rate": 0.1 },
+  "ratelimits": [
+    {
+      "name": "PREDICTION_BET_RATE_LIMITER",
+      "namespace_id": "26090601",
+      "simple": { "limit": 20, "period": 60 },
+    },
+  ],
+  "observability": { "enabled": true, "head_sampling_rate": 1 },
   "account_id": "7e10da8ec857bed20f4b1010952279dd",
   "routes": [
     { "pattern": "yu-zora.com/project_sixth", "zone_name": "yu-zora.com" },
     { "pattern": "yu-zora.com/project_sixth/*", "zone_name": "yu-zora.com" },
   ],
+"env": {
+  "staging": {
+    "workers_dev": true,
+    "routes": [],
+    "assets": {
+        "directory": "./dist",
+        "binding": "ASSETS",
+        "run_worker_first": true,
+        "html_handling": "none",
+        "not_found_handling": "none",
+      },
+      "vars": {
+        "ENVIRONMENT": "staging",
+        "TURNSTILE_SITE_KEY": "1x00000000000000000000AA",
+        // Official Cloudflare test credential. Public and staging-only.
+        "TURNSTILE_SECRET_KEY": "1x0000000000000000000000000000000AA",
+        "TURNSTILE_EXPECTED_HOSTNAME": "",
+      },
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "project-sixth-staging",
+          "database_id": "17fdcc79-71b2-45de-82de-212f74201656",
+          "migrations_dir": "migrations",
+        },
+      ],
+      "ratelimits": [
+        {
+          "name": "PREDICTION_BET_RATE_LIMITER",
+          "namespace_id": "26090602",
+          "simple": { "limit": 20, "period": 60 },
+        },
+      ],
+      "observability": { "enabled": true, "head_sampling_rate": 1 },
+    },
+  },
 }

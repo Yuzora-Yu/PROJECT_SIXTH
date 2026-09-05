@@ -1114,3 +1114,97 @@
     grid-column: 1 / -1;
   }
 }
+
+.prediction-market-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.prediction-market-summary span {
+  display: flex;
+  min-height: 52px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  flex-direction: column;
+  justify-content: center;
+  color: var(--muted);
+  font-size: 0.7rem;
+}
+.prediction-market-summary b {
+  color: var(--text);
+  font-size: 0.9rem;
+}
+.prediction-bet-panel {
+  margin: 4px 0 14px;
+  padding: 12px;
+  border: 1px solid #41625b;
+  border-radius: 10px;
+  background: #0b151b;
+}
+.prediction-stake-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 10px;
+}
+.prediction-stake-row label {
+  display: grid;
+  gap: 5px;
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+.prediction-stake-input {
+  width: 100%;
+  min-height: 44px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: #091116;
+  color: var(--text);
+  font: inherit;
+}
+.prediction-stake-stepper {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(64px, 1fr));
+  gap: 6px;
+}
+.prediction-stake-stepper button {
+  min-height: 44px;
+}
+.prediction-stake-quick {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+  margin-top: 8px;
+}
+.prediction-stake-quick button {
+  min-height: 34px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: #101c23;
+  color: var(--muted);
+  font-size: 0.7rem;
+}
+.prediction-stake-quick button:hover {
+  border-color: #6da997;
+  color: var(--mint);
+}
+.prediction-bet-panel > .primary {
+  width: 100%;
+  margin-top: 8px;
+}
+#prediction-turnstile {
+  min-height: 65px;
+  margin: 18px 0;
+}
+
+@media (max-width: 480px) {
+  .prediction-stake-row {
+    grid-template-columns: 1fr;
+  }
+  .prediction-stake-stepper {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}

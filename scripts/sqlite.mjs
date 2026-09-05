@@ -16,6 +16,9 @@ export function localDatabase(filename = ":memory:") {
         async first() {
           return native.prepare(sql).get(...this.params) || null;
         },
+        async all() {
+          return { results: native.prepare(sql).all(...this.params) };
+        },
         async run() {
           const r = native.prepare(sql).run(...this.params);
           return { meta: { changes: Number(r.changes) } };

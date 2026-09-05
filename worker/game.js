@@ -53,13 +53,23 @@ export function newPlayer(id, ms) {
   };
 }
 
-export function publicPredictions(p, ms) {
+export function publicPredictions(p, ms, marketState = new Map(), betting = null) {
   const saved = p.predictions || {};
   const items = predictionCatalog
     .filter((item) => ms >= Date.parse(item.publishAt))
     .map((item) => {
       const state = predictionState(item, ms);
-      const selection = saved[predictionKey(item)] || null;
+      const market = marketState.get(predictionKey(item)) || null;
+      const bet = market?.bet || null;
+      const legacySelection = saved[predictionKey(item)] || null;
+      const selection = bet
+        ? {
+            optionId: bet.optionId,
+            selectedAt: bet.placedAt,
+            updatedAt: bet.updatedAt,
+            stakeRc: bet.stakeRc,
+          }
+        : legacySelection;
       const result =
         state === "settled"
           ? {
@@ -84,6 +94,26 @@ export function publicPredictions(p, ms) {
         source: item.source,
         state,
         selection,
+        legacySelection: !bet && legacySelection ? legacySelection : null,
+        bet,
+        market: market
+          ? {
+              final: market.final,
+              totalStakeRc: market.totalPoolRc,
+              bettorCount: market.bettorCount,
+              choices: market.choices,
+            }
+          : {
+              final: state !== "open",
+              totalStakeRc: 0,
+              bettorCount: 0,
+              choices: Object.fromEntries(
+                item.choices.map((choice) => [
+                  choice.id,
+                  { stakeRc: 0, bettorCount: 0, odds: null },
+                ]),
+              ),
+            },
         result,
         correct:
           result && selection ? result.optionId === selection.optionId : null,
@@ -98,6 +128,7 @@ export function publicPredictions(p, ms) {
     .sort((a, b) => a.ms - b.ms)[0];
   return {
     catalogVersion: predictionCatalogVersion,
+    betting,
     items,
     nextChangeAt: nextChange?.value || null,
     stats: {
@@ -130,6 +161,7 @@ export function publicPlayer(p, ms) {
     profileBonus: p.profileBonus || emptySenses(),
     profileApplied: Boolean(p.profileBonus),
     rc: p.rc,
+    predictionBettingVerified: Boolean(p.predictionBettingVerifiedAt),
     senseXp: p.senseXp,
     senseStats: senseStats(p.senseXp, p.profileBonus),
     characters: visibleCharacters,
@@ -215,31 +247,8 @@ export function perform(p, path, body, ms) {
   const predictionMatch = path.match(
     /^\/api\/predictions\/(PRED-\d{8}-\d{3})\/vote$/,
   );
-  if (predictionMatch) {
-    assert(Number.isInteger(body.version), "予測versionを確認してください。");
-    const item = findPrediction(predictionMatch[1], body.version);
-    assert(item, "予測問題が見つかりません。", 404);
-    assert(
-      predictionState(item, ms) === "open",
-      "この予測は現在受け付けていません。",
-      409,
-    );
-    assert(
-      typeof body.optionId === "string" &&
-        item.choices.some((choice) => choice.id === body.optionId),
-      "選択肢を確認してください。",
-    );
-    p.predictions ||= {};
-    const key = predictionKey(item);
-    const previous = p.predictions[key];
-    const selection = {
-      optionId: body.optionId,
-      selectedAt: previous?.selectedAt || iso(ms),
-      updatedAt: iso(ms),
-    };
-    p.predictions[key] = selection;
-    return { predictionId: item.id, version: item.version, selection };
-  }
+  if (predictionMatch)
+    throw new GameError("予測投票はRCベット方式へ移行しました。画面を再読み込みしてください。", 410);
   if (path === "/api/character/starter") {
     assert(!p.starterChosen, "最初の仲間は登録済みです。", 409);
     assert(

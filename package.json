@@ -1,6 +1,6 @@
 {
   "name": "project-sixth",
-  "version": "0.4.2",
+  "version": "0.5.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -12,8 +12,12 @@
     "build": "node scripts/build.mjs",
     "test": "node --test tests/*.test.mjs",
     "check": "npm run test:predictions-import && npm run test:google-sheets-bridge && npm run test && npm run build",
-    "dev:worker": "npm run build && wrangler dev",
-    "db:local": "wrangler d1 migrations apply project-sixth --local",
+    "dev:worker": "npm run build && wrangler dev --env staging",
+    "db:local": "wrangler d1 migrations apply DB --local --env staging",
+    "db:staging": "wrangler d1 migrations apply project-sixth-staging --remote --env staging",
+    "dev:staging": "npm run build && wrangler dev --env staging",
+    "deploy:staging:check": "npm run build && wrangler deploy --dry-run --env staging",
+    "deploy:staging": "npm run check && wrangler deploy --env staging",
     "deploy:check": "npm run build && wrangler deploy --dry-run",
     "test:browser": "playwright test",
     "format": "prettier --write index.html css js shared worker scripts tests docs/*.md README.md package.json playwright.config.js wrangler.jsonc .github",

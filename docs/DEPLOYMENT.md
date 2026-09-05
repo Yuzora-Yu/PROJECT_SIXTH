@@ -1,5 +1,19 @@
 # 配信記録 — 2026-09-05
 
+## v0.5.0 実装済み・staging検証待ち（未配信）
+
+現実予測へRCベット、パリミュチュエル方式のオッズ、結果確定後のRC払戻と「予見」XP付与を追加する実装を用意した。**この節の変更はまだ本番D1 / 本番Workerへ適用していない。**
+
+- 投票は10〜1000 RCを10 RC単位。各 `prediction_id + version` の最初の10 RCは無料で、所持RC 0でも10 RC投票できる。1000 RC投票時の実消費上限は990 RC。
+- 無料10 RCも市場プールと払戻へ含める。払戻は0% house edgeのパリミュチュエル方式で、RC側に倍率上限は設けない。
+- 的中時だけ既存の研究XP「予見」へ `20 + floor(10 * log2(min(final_odds, 8)))` XPを付与する。初期XP用倍率上限は8倍（最大50 XP）で、参加規模が十分になった将来の16倍解放候補をコードコメントに残す。
+- D1 migration `0002_prediction_betting.sql` を追加し、bet、option pool、market snapshot、RC ledger、XP ledgerを分離する。残高の正本は引き続き `players.data.rc`。
+- 初回ベットだけTurnstileを要求する。本番Site KeyはWrangler設定、SecretはCloudflare Worker Secret `TURNSTILE_SECRET_KEY` にのみ保存する。プレイヤーベット情報をGemini Spark Sheetへ書き戻さない。
+- stagingは `project-sixth-staging` Worker + `project-sixth-staging` D1に分離し、本番routeを持たせない。stagingのTurnstileはCloudflare公式の常時成功テストキーだけを使う。
+- Rate Limiting bindingは荒らし対策だけに使い、会計整合性はD1 transaction、player revision CAS、Idempotency-Key、UNIQUE制約で保証する。
+
+本番適用は、stagingでmigration・初回Turnstile・無料10 RC・増減額・選択変更・同時送信・締切・settlement・二重払戻防止を通した後にのみ行う。
+
 公開URL: https://yu-zora.com/project_sixth/
 
 - アプリ / 公開API: v0.4.2

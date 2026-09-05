@@ -75,3 +75,14 @@ test("a pending battle from the prior reward rule settles for 10 RC", () => {
   assert.equal(record.result.rc, 10);
   assert.equal(player.rc, config.economy.initialRC + 10);
 });
+
+
+test("prediction market economy contract keeps 10 RC free and XP odds capped at 8x", () => {
+  assert.equal(config.predictionBetting.minStakeRC, 10);
+  assert.equal(config.predictionBetting.maxStakeRC, 1000);
+  assert.equal(config.predictionBetting.stakeStepRC, 10);
+  assert.equal(config.predictionBetting.freeStakeRC, 10);
+  assert.equal(config.predictionBetting.houseEdge, 0);
+  assert.equal(config.predictionBetting.hitBaseXP, 20);
+  assert.equal(config.predictionBetting.xpOddsCap, 8);
+});

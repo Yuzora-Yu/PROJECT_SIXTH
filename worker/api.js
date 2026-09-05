@@ -7,6 +7,13 @@ import {
   perform,
   GameError,
 } from "./game.js";
+import {
+  loadPredictionMarketState,
+  placePredictionBet,
+  publicPredictionBettingConfig,
+  settlePlayerPredictions,
+} from "./prediction-betting.js";
+
 const json = (data, status = 200, headers = {}) =>
   Response.json(
     { version: config.gameVersion, ...data },
@@ -19,6 +26,7 @@ const json = (data, status = 200, headers = {}) =>
       },
     },
   );
+
 async function hash(text) {
   return Array.from(
     new Uint8Array(
@@ -28,6 +36,7 @@ async function hash(text) {
     .map((b) => b.toString(16).padStart(2, "0"))
     .join("");
 }
+
 async function readBody(request) {
   if (!request.headers.get("content-type")?.startsWith("application/json"))
     throw new GameError("JSON形式で送信してください。", 415);
@@ -60,6 +69,7 @@ async function readBody(request) {
     throw new GameError("送信内容を確認してください。");
   }
 }
+
 async function claimDailyAccessBonus(db, row, ms) {
   const dayJst = dayKey(ms),
     amount = config.economy.dailyAccessRC;
@@ -91,7 +101,32 @@ async function claimDailyAccessBonus(db, row, ms) {
     },
   };
 }
-export async function handleApi(request, db, clock = now, cookiePath = "/") {
+
+function runtimeFrom(input) {
+  if (input?.prepare && typeof input.prepare === "function") return { DB: input };
+  return input || {};
+}
+
+async function predictionPayload(db, player, ms, env) {
+  const marketState = await loadPredictionMarketState(db, player.id, ms);
+  return publicPredictions(
+    player,
+    ms,
+    marketState,
+    publicPredictionBettingConfig(player, env),
+  );
+}
+
+export async function handleApi(
+  request,
+  runtime,
+  clock = now,
+  cookiePath = "/",
+  dependencies = {},
+) {
+  const env = runtimeFrom(runtime);
+  const db = env.DB;
+  const deps = { fetch: dependencies.fetch || fetch };
   const url = new URL(request.url),
     ms = clock();
   let cookie;
@@ -150,7 +185,13 @@ export async function handleApi(request, db, clock = now, cookiePath = "/") {
       row = claim.row;
       accessBonus = claim.accessBonus;
     }
-    const p = JSON.parse(row.data);
+
+    // Settlement is lazy and idempotent: any normal authenticated request can
+    // finalize already-resolved prediction bets without a separate cron.
+    const settlement = await settlePlayerPredictions(db, row, ms);
+    row = settlement.row;
+    let p = settlement.player;
+
     if (
       request.method === "GET" &&
       ["/api/bootstrap", "/api/me"].includes(url.pathname)
@@ -169,13 +210,14 @@ export async function handleApi(request, db, clock = now, cookiePath = "/") {
       return json(
         {
           serverTime: iso(ms),
-          predictions: publicPredictions(p, ms),
+          predictions: await predictionPayload(db, p, ms, env),
         },
         200,
         headers,
       );
     if (request.method !== "POST")
       throw new GameError("この操作は利用できません。", 405);
+
     const body = await readBody(request),
       key = request.headers.get("Idempotency-Key");
     if (!key || !/^[a-zA-Z0-9-]{16,80}$/.test(key))
@@ -196,13 +238,45 @@ export async function handleApi(request, db, clock = now, cookiePath = "/") {
           player: publicPlayer(p, ms),
           serverTime: iso(ms),
           ...(url.pathname.startsWith("/api/predictions/")
-            ? { predictions: publicPredictions(p, ms) }
+            ? { predictions: await predictionPayload(db, p, ms, env) }
             : {}),
         },
         200,
         headers,
       );
     }
+
+    const predictionBet = url.pathname.match(
+      /^\/api\/predictions\/(PRED-\d{8}-\d{3})\/bet$/,
+    );
+    if (predictionBet) {
+      const placed = await placePredictionBet({
+        request,
+        db,
+        row,
+        player: p,
+        predictionId: predictionBet[1],
+        body,
+        opKey: key,
+        fingerprint,
+        ms,
+        env,
+        deps,
+      });
+      row = placed.row;
+      p = placed.player;
+      return json(
+        {
+          result: placed.result,
+          player: publicPlayer(p, ms),
+          predictions: await predictionPayload(db, p, ms, env),
+          serverTime: iso(ms),
+        },
+        200,
+        headers,
+      );
+    }
+
     const result = perform(p, url.pathname, body, ms);
     // CAS + receipt insertion in one D1 transaction: no lost updates, no double spend.
     const updated = await db.batch([
@@ -236,7 +310,7 @@ export async function handleApi(request, db, clock = now, cookiePath = "/") {
         player: publicPlayer(p, ms),
         serverTime: iso(ms),
         ...(url.pathname.startsWith("/api/predictions/")
-          ? { predictions: publicPredictions(p, ms) }
+          ? { predictions: await predictionPayload(db, p, ms, env) }
           : {}),
       },
       200,

@@ -13,6 +13,7 @@ import { dateLabel, astrology, dayKey } from "../shared/core.js";
 import { monsters } from "../data/prisma/catalog.js";
 import { characters, isAvailableCharacter } from "../shared/roster.js";
 import { api, local, serverNow } from "./api.js";
+import { loadTurnstile } from "./turnstile.js";
 import {
   radar,
   button,
@@ -32,6 +33,7 @@ let player = null,
 let observedDay = null,
   predictionData = null,
   predictionRefreshTimer = null;
+const predictionDrafts = new Map();
 let pendingAccessBonus = null,
   accessBonusUiReady = false;
 const terminalEntryDurationMs = 1150;
@@ -155,7 +157,7 @@ function future() {
       intro(
         "FIELD TEST",
         "現実予測",
-        "結果が確定していない出来事に、いまの直感で答える実地試験です。",
+        "結果が確定していない出来事に、RCを使って直感を記録する実地試験です。",
       ) +
       `<section class="empty-state"><span class="symbol">◷</span><h2>予測データを取得できませんでした。</h2><p class="muted">通信状態を確認して、もう一度接続してください。</p>${button("再接続", "reconnect", "secondary")}</section>`
     );
@@ -171,9 +173,9 @@ function future() {
     intro(
       "FIELD TEST",
       "現実予測",
-      "結果が確定していない出来事に、いまの直感で答える実地試験です。",
+      "結果が確定していない出来事に、RCを使って直感を記録する実地試験です。",
     ) +
-    `<section class="panel prediction-overview"><div><span class="eyebrow">OBSERVATION STATUS</span><h2>${statusTitle}</h2><p>選択は締切まで変更できます。結果が確定すると、ここで記録と照合します。</p></div><div class="prediction-stats"><span>記録済み<b>${data.stats.recorded}</b></span><span>照合済み<b>${data.stats.settled}</b></span><span>的中<b>${data.stats.settled ? `${data.stats.correct}/${data.stats.settled}` : "—"}</b></span></div></section>` +
+    `<section class="panel prediction-overview"><div><span class="eyebrow">OBSERVATION STATUS</span><h2>${statusTitle}</h2><p>10〜1000 RCを10 RC単位で投票。各予想の最初の10 RCは無料で、選択と金額は締切まで変更できます。RCは無料・換金不能のゲーム内通貨です。</p></div><div class="prediction-stats"><span>記録済み<b>${data.stats.recorded}</b></span><span>照合済み<b>${data.stats.settled}</b></span><span>的中<b>${data.stats.settled ? `${data.stats.correct}/${data.stats.settled}` : "—"}</b></span></div></section>` +
     `<div class="prediction-list">${data.items.map(predictionCard).join("")}</div>`
   );
 }
@@ -195,38 +197,138 @@ const jstDateTime = new Intl.DateTimeFormat("ja-JP", {
 });
 const formatJst = (value) => `${jstDateTime.format(Date.parse(value))} JST`;
 
+function predictionDraft(item) {
+  const key = `${item.id}|${item.version}`;
+  if (!predictionDrafts.has(key))
+    predictionDrafts.set(key, {
+      optionId: item.bet?.optionId || item.selection?.optionId || null,
+      stakeRc: item.bet?.stakeRc || predictionData?.betting?.freeStakeRc || 10,
+    });
+  return predictionDrafts.get(key);
+}
+
+const oddsText = (value) =>
+  Number.isFinite(value) ? `${Number(value).toFixed(2)}x` : "—";
+
+function predictionStateNote(item, selectedChoice, resultChoice) {
+  if (item.state === "upcoming")
+    return `${formatJst(item.publishAt)}から受け付けます。`;
+  if (item.state === "open") {
+    if (item.bet)
+      return `現在の投票：${escape(selectedChoice?.label || item.bet.optionId)} / ${item.bet.stakeRc.toLocaleString("ja-JP")} RC。締切までは選択・金額を変更できます。`;
+    if (item.legacySelection)
+      return `旧方式の記録「${escape(selectedChoice?.label || "記録あり")}」があります。新しいRC投票として確定するには投票ボタンを押してください。`;
+    return "選択肢と投票RCを決めてください。各予想の最初の10 RCは残高を消費しません。";
+  }
+  if (item.state === "settled") {
+    if (!item.bet)
+      return selectedChoice
+        ? `旧記録：${escape(selectedChoice.label)} ／ 結果：${escape(resultChoice?.label || "確認中")}`
+        : `結果：${escape(resultChoice?.label || "確認中")}`;
+    if (!item.bet.settledAt) return "結果を確認しています。再接続すると払戻を反映します。";
+    return item.bet.correct
+      ? `🎯 的中 / 最終オッズ ${oddsText(item.bet.finalOdds)} / 払戻 +${Number(item.bet.payoutRc || 0).toLocaleString("ja-JP")} RC / 予見 +${Number(item.bet.predictionXp || 0)} XP`
+      : `MISS / 最終オッズ ${oddsText(item.bet.finalOdds)} / 払戻 0 RC / +0 XP`;
+  }
+  return item.bet
+    ? `あなたの投票：${escape(selectedChoice?.label || item.bet.optionId)} / ${item.bet.stakeRc.toLocaleString("ja-JP")} RC`
+    : selectedChoice
+      ? `あなたの旧記録：${escape(selectedChoice.label)}`
+      : "受付は終了しました。";
+}
+
 function predictionCard(item) {
-  const selected = item.selection?.optionId;
+  const draft = predictionDraft(item);
+  const selected = item.state === "open"
+    ? draft.optionId
+    : item.bet?.optionId || item.selection?.optionId;
   const selectedChoice = item.choices.find((choice) => choice.id === selected);
+  const storedSelectionId = item.bet?.optionId || item.selection?.optionId || null;
+  const storedChoice = item.choices.find((choice) => choice.id === storedSelectionId);
   const resultChoice = item.choices.find(
     (choice) => choice.id === item.result?.optionId,
   );
-  const stateNote =
-    item.state === "upcoming"
-      ? `${formatJst(item.publishAt)}から受け付けます。`
-      : item.state === "open"
-        ? selectedChoice
-          ? `「${escape(selectedChoice.label)}」で記録済みです。締切までは変更できます。`
-          : "直感に近いものを、ひとつ選んでください。"
-        : item.state === "settled"
-          ? selectedChoice
-            ? `あなたの記録：${escape(selectedChoice.label)} ／ 結果：${escape(resultChoice?.label || "確認中")}`
-            : `結果：${escape(resultChoice?.label || "確認中")}`
-          : selectedChoice
-            ? `あなたの記録：${escape(selectedChoice.label)}`
-            : "受付は終了しました。";
+  const stateNote = predictionStateNote(item, storedChoice, resultChoice);
   const sourceUrl = /^https:\/\//.test(item.source?.url || "")
     ? escape(item.source.url)
     : "";
+  const betting = predictionData?.betting;
+  const freeStakeRc = betting?.freeStakeRc || 10;
+  const previousPaid = item.bet?.paidStakeRc || 0;
+  const paidStake = Math.max(0, draft.stakeRc - freeStakeRc);
+  const rcDelta = previousPaid - paidStake;
+  const insufficient = rcDelta < 0 && -rcDelta > Number(player?.rc || 0);
+  const costText = rcDelta < 0
+    ? `追加消費 ${(-rcDelta).toLocaleString("ja-JP")} RC`
+    : rcDelta > 0
+      ? `返却 +${rcDelta.toLocaleString("ja-JP")} RC`
+      : item.bet
+        ? "残高変動 0 RC"
+        : `残高消費 ${paidStake.toLocaleString("ja-JP")} RC`;
+  const betPanel = item.state === "open" && betting
+    ? `<div class="prediction-bet-panel"><div class="prediction-market-summary"><span>総プール<b>${Number(item.market?.totalStakeRc || 0).toLocaleString("ja-JP")} RC</b></span><span>参加<b>${Number(item.market?.bettorCount || 0).toLocaleString("ja-JP")}</b></span></div><div class="prediction-stake-row"><label>投票RC<input class="prediction-stake-input" data-prediction-key="${item.id}|${item.version}" type="number" inputmode="numeric" min="${betting.minStakeRc}" max="${betting.maxStakeRc}" step="${betting.stakeStepRc}" value="${draft.stakeRc}"></label><div class="prediction-stake-stepper">${button("−10", `prediction-stake-${item.id}-v${item.version}--10`, "secondary", draft.stakeRc <= betting.minStakeRc ? "disabled" : "")}${button("＋10", `prediction-stake-${item.id}-v${item.version}-10`, "secondary", draft.stakeRc >= betting.maxStakeRc ? "disabled" : "")}</div></div><div class="prediction-stake-quick"><button data-action="prediction-stake-set-${item.id}-v${item.version}-10">10</button><button data-action="prediction-stake-set-${item.id}-v${item.version}-100">100</button><button data-action="prediction-stake-set-${item.id}-v${item.version}-500">500</button><button data-action="prediction-stake-set-${item.id}-v${item.version}-1000">1000</button></div><p class="small muted">最初の10 RCは無料。${costText}${insufficient ? " / RC不足" : ""}</p>${button(item.bet ? "投票を更新する" : "この予想に投票する", `prediction-bet-${item.id}-v${item.version}`, "primary", !selected || insufficient ? "disabled" : "")}</div>`
+    : "";
   return `<section class="panel prediction-card ${item.state}"><div class="prediction-card-head"><span class="prediction-category">${escape(item.categoryLabel)}</span><span class="prediction-state">${predictionStatus[item.state]}</span></div><h2>${escape(item.question)}</h2><div class="prediction-deadline"><span>受付締切</span><b>${formatJst(item.closeAt)}</b></div><div class="prediction-choices">${item.choices
-    .map(
-      (choice) =>
-        `<button class="prediction-choice ${selected === choice.id ? "selected" : ""}" data-action="prediction-vote-${item.id}-v${item.version}-${choice.id}" aria-pressed="${selected === choice.id}" ${item.state === "open" ? "" : "disabled"}><span>${choice.id}</span><b>${escape(choice.label)}</b>${selected === choice.id ? "<small>記録済み</small>" : ""}</button>`,
-    )
-    .join(
-      "",
-    )}</div><p class="prediction-note ${item.correct === true ? "correct" : item.correct === false ? "incorrect" : ""}">${stateNote}</p><details class="prediction-rule"><summary>判定方法と情報源</summary><p>${escape(item.resolutionRule)}</p>${sourceUrl ? `<a href="${sourceUrl}" target="_blank" rel="noopener noreferrer">${escape(item.source.name)}　↗</a>` : ""}<p class="small muted">結果確認予定：${formatJst(item.resultDueAt)}</p></details></section>`;
+    .map((choice) => {
+      const marketChoice = item.market?.choices?.[choice.id] || {};
+      const stored = item.bet?.optionId === choice.id;
+      return `<button class="prediction-choice ${selected === choice.id ? "selected" : ""}" data-action="prediction-select-${item.id}-v${item.version}-${choice.id}" aria-pressed="${selected === choice.id}" ${item.state === "open" ? "" : "disabled"}><span>${choice.id}</span><b>${escape(choice.label)}</b><small>${oddsText(marketChoice.odds)} · ${Number(marketChoice.stakeRc || 0).toLocaleString("ja-JP")} RC${stored ? " · 投票済み" : ""}</small></button>`;
+    })
+    .join("")}</div>${betPanel}<p class="prediction-note ${item.correct === true ? "correct" : item.correct === false ? "incorrect" : ""}">${stateNote}</p><details class="prediction-rule"><summary>判定方法と情報源</summary><p>${escape(item.resolutionRule)}</p>${sourceUrl ? `<a href="${sourceUrl}" target="_blank" rel="noopener noreferrer">${escape(item.source.name)}　↗</a>` : ""}<p class="small muted">結果確認予定：${formatJst(item.resultDueAt)}</p></details></section>`;
 }
+
+async function predictionTurnstileToken() {
+  const sitekey = predictionData?.betting?.turnstileSiteKey;
+  if (!sitekey) throw new Error("投票確認サービスが設定されていません。");
+  modal(
+    "初回投票の確認",
+    '<p>無料10 RCを含む予想市場を守るため、この端末では最初の投票時だけ確認を行います。</p><div id="prediction-turnstile"></div><p class="small muted">確認後は、この匿名プレイヤーでは通常の投票操作だけで利用できます。</p>',
+    "PREDICTION SECURITY",
+  );
+  let turnstile;
+  try {
+    turnstile = await loadTurnstile();
+  } catch (error) {
+    closeModal();
+    throw error;
+  }
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    const finish = (fn, value) => {
+      if (settled) return;
+      settled = true;
+      setCleanup(null);
+      try {
+        turnstile.remove(widgetId);
+      } catch {}
+      closeModal();
+      fn(value);
+    };
+    let widgetId;
+    widgetId = turnstile.render("#prediction-turnstile", {
+      sitekey,
+      action: "prediction-bet",
+      theme: "dark",
+      language: "ja",
+      size: "flexible",
+      appearance: "interaction-only",
+      callback: (token) => finish(resolve, token),
+      "error-callback": () =>
+        finish(reject, new Error("投票確認に失敗しました。もう一度お試しください。")),
+      "expired-callback": () =>
+        finish(reject, new Error("投票確認の有効期限が切れました。もう一度お試しください。")),
+    });
+    setCleanup(() => {
+      if (settled) return;
+      settled = true;
+      try {
+        turnstile.remove(widgetId);
+      } catch {}
+      reject(new Error("投票確認を中断しました。"));
+    });
+  });
+}
+
 function charactersPage() {
   return (
     intro(
@@ -410,7 +512,14 @@ function predictionArchive() {
             const choice = item.choices.find(
               (candidate) => candidate.id === item.selection.optionId,
             );
-            return `<p><span>${escape(item.categoryLabel)}</span><b>${escape(choice?.label || "記録あり")}</b><small>${escape(item.question)}</small></p>`;
+            const betSummary = item.bet
+              ? item.bet.settledAt
+                ? item.bet.correct
+                  ? `${item.bet.stakeRc} RC · 的中 · 払戻 ${Number(item.bet.payoutRc || 0).toLocaleString("ja-JP")} RC · 予見 +${Number(item.bet.predictionXp || 0)} XP`
+                  : `${item.bet.stakeRc} RC · MISS · 払戻 0 RC`
+                : `${item.bet.stakeRc} RC · ${item.state === "open" ? "受付中" : "結果待ち"}`
+              : "旧方式の記録";
+            return `<p><span>${escape(item.categoryLabel)}</span><b>${escape(choice?.label || "記録あり")}</b><small>${escape(item.question)}<br>${escape(betSummary)}</small></p>`;
           })
           .join("")}</div>`
       : '<p class="muted">記録はまだありません。</p>'
@@ -456,21 +565,90 @@ function welcome() {
   local.set("welcomed", true);
 }
 async function action(name) {
-  const predictionVote = name.match(
-    /^prediction-vote-(PRED-\d{8}-\d{3})-v(\d+)-([A-D])$/,
+  const predictionSelect = name.match(
+    /^prediction-select-(PRED-\d{8}-\d{3})-v(\d+)-([A-D])$/,
   );
-  if (predictionVote) {
+  if (predictionSelect) {
     const item = predictionData?.items.find(
       (candidate) =>
-        candidate.id === predictionVote[1] &&
-        candidate.version === Number(predictionVote[2]),
+        candidate.id === predictionSelect[1] &&
+        candidate.version === Number(predictionSelect[2]),
     );
-    if (!item) throw new Error("予測問題を確認できませんでした。");
-    await mutate(`/api/predictions/${item.id}/vote`, {
+    if (!item || item.state !== "open")
+      throw new Error("予測問題を確認できませんでした。");
+    predictionDraft(item).optionId = predictionSelect[3];
+    render();
+    return;
+  }
+  const predictionStake = name.match(
+    /^prediction-stake-(PRED-\d{8}-\d{3})-v(\d+)-(-?10)$/,
+  );
+  if (predictionStake) {
+    const item = predictionData?.items.find(
+      (candidate) =>
+        candidate.id === predictionStake[1] &&
+        candidate.version === Number(predictionStake[2]),
+    );
+    if (!item || item.state !== "open")
+      throw new Error("予測問題を確認できませんでした。");
+    const betting = predictionData.betting;
+    const draft = predictionDraft(item);
+    draft.stakeRc = Math.max(
+      betting.minStakeRc,
+      Math.min(betting.maxStakeRc, draft.stakeRc + Number(predictionStake[3])),
+    );
+    render();
+    return;
+  }
+  const predictionStakeSet = name.match(
+    /^prediction-stake-set-(PRED-\d{8}-\d{3})-v(\d+)-(10|100|500|1000)$/,
+  );
+  if (predictionStakeSet) {
+    const item = predictionData?.items.find(
+      (candidate) =>
+        candidate.id === predictionStakeSet[1] &&
+        candidate.version === Number(predictionStakeSet[2]),
+    );
+    if (!item || item.state !== "open")
+      throw new Error("予測問題を確認できませんでした。");
+    predictionDraft(item).stakeRc = Number(predictionStakeSet[3]);
+    render();
+    return;
+  }
+  const predictionBet = name.match(
+    /^prediction-bet-(PRED-\d{8}-\d{3})-v(\d+)$/,
+  );
+  if (predictionBet) {
+    const item = predictionData?.items.find(
+      (candidate) =>
+        candidate.id === predictionBet[1] &&
+        candidate.version === Number(predictionBet[2]),
+    );
+    if (!item || item.state !== "open")
+      throw new Error("予測問題を確認できませんでした。");
+    const draft = predictionDraft(item);
+    if (!draft.optionId) throw new Error("選択肢を選んでください。");
+    let turnstileToken;
+    if (!predictionData?.betting?.verified)
+      turnstileToken = await predictionTurnstileToken();
+    const data = await mutate(`/api/predictions/${item.id}/bet`, {
       version: item.version,
-      optionId: predictionVote[3],
+      optionId: draft.optionId,
+      stakeRc: draft.stakeRc,
+      ...(turnstileToken ? { turnstileToken } : {}),
     });
-    toast("予測を記録しました。");
+    predictionDrafts.delete(`${item.id}|${item.version}`);
+    render();
+    const delta = Number(data.result?.rcDelta || 0);
+    toast(
+      delta < 0
+        ? `投票しました。${-delta} RCを消費しました。`
+        : delta > 0
+          ? `投票を更新し、${delta} RCを返却しました。`
+          : item.bet
+            ? "投票を更新しました。残高の変動はありません。"
+            : "投票しました。無料10 RC分は残高を消費しません。",
+    );
     return;
   }
   if (name === "name-save") {
@@ -719,6 +897,24 @@ document.querySelector("#dialog").addEventListener("cancel", (e) => {
   closeModal();
 });
 document.addEventListener("change", (e) => {
+  if (e.target.matches?.(".prediction-stake-input")) {
+    const [predictionId, versionText] = String(e.target.dataset.predictionKey || "").split("|");
+    const item = predictionData?.items.find(
+      (candidate) => candidate.id === predictionId && candidate.version === Number(versionText),
+    );
+    const betting = predictionData?.betting;
+    if (item && betting) {
+      let value = Number(e.target.value);
+      if (!Number.isFinite(value)) value = betting.minStakeRc;
+      value = Math.round(value / betting.stakeStepRc) * betting.stakeStepRc;
+      predictionDraft(item).stakeRc = Math.max(
+        betting.minStakeRc,
+        Math.min(betting.maxStakeRc, value),
+      );
+      render();
+    }
+    return;
+  }
   if (e.target.id === "large-text") {
     local.set("large-text", e.target.checked);
     applySettings();
