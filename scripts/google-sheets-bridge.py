@@ -765,7 +765,11 @@ class SheetsBridge:
                     f"07_SOURCE_MASTER row {row_number} is missing source_id"
                 )
             if source_id in source_by_id:
-                raise BridgeError("07_SOURCE_MASTER contains a duplicate source_id")
+                first_row = int(source_by_id[source_id]["_row_number"])
+                raise BridgeError(
+                    f"07_SOURCE_MASTER source_id {source_id!r} is duplicated "
+                    f"at rows {first_row} and {row_number}"
+                )
             source_by_id[source_id] = source
 
         keys_seen: dict[str, int] = {}

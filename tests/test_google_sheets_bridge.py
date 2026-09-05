@@ -341,6 +341,22 @@ class PlanTests(unittest.TestCase):
         with self.assertRaisesRegex(BRIDGE.BridgeError, "07_SOURCE_MASTER header"):
             bridge.plan()
 
+    def test_duplicate_source_reports_id_and_both_sheet_rows(self):
+        data = snapshot(
+            [prediction_record()],
+            sources=[source_record(), source_record()],
+        )
+        data["ranges"][2].insert(4, [])
+        bridge = BRIDGE.SheetsBridge(
+            FakeApi([data]), clock=lambda: FIXED_NOW
+        )
+
+        with self.assertRaisesRegex(
+            BRIDGE.BridgeError,
+            r"source_id 'SRC001'.*rows 4 and 6",
+        ):
+            bridge.plan()
+
     def test_more_than_six_due_rows_are_stably_sliced_and_deferred(self):
         records = [prediction_record(number) for number in range(7, 0, -1)]
         plan = BRIDGE.SheetsBridge(

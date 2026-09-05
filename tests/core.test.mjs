@@ -15,16 +15,49 @@ import {
 import { newPlayer, perform, publicPlayer } from "../worker/game.js";
 import { senseBonuses, simulateBattle } from "../js/battle/prisma-adapter.js";
 import { characters } from "../shared/roster.js";
-import { predictionCatalog, predictionState } from "../worker/predictions.js";
+import {
+  predictionCatalog,
+  predictionCatalogVersion,
+  predictionState,
+} from "../worker/predictions.js";
+import {
+  predictionCatalogRelease,
+  rawPredictionCatalog,
+} from "../worker/prediction-catalog.generated.js";
 const time = Date.parse("2026-09-04T02:00:00Z");
 test("prediction catalog contains only valid release entries and honors JST windows", () => {
-  assert.equal(predictionCatalog.length, 6);
+  const seededKeys = [
+    "PRED-20260905-001|1",
+    "PRED-20260905-004|1",
+    "PRED-20260905-005|1",
+    "PRED-20260905-007|1",
+    "PRED-20260905-008|1",
+    "PRED-20260905-011|1",
+  ];
+  const catalogKeys = predictionCatalog.map(
+    (item) => `${item.id}|${item.version}`,
+  );
+  assert.equal(predictionCatalog.length, rawPredictionCatalog.length);
+  assert.equal(new Set(catalogKeys).size, catalogKeys.length);
+  assert.ok(seededKeys.every((key) => catalogKeys.includes(key)));
+  assert.equal(
+    predictionCatalogVersion,
+    predictionCatalogRelease.releaseVersion,
+  );
+  assert.match(predictionCatalogVersion, /^\d+\.\d+\.\d+$/);
   assert.ok(
     predictionCatalog.every(
-      (item) => item.choices.length >= 2 && item.choices.length <= 4,
+      (item) =>
+        item.choices.length >= 2 &&
+        item.choices.length <= 4 &&
+        Date.parse(item.publishAt) < Date.parse(item.closeAt) &&
+        Date.parse(item.closeAt) < Date.parse(item.resultDueAt),
     ),
   );
-  const first = predictionCatalog[0];
+  const first = predictionCatalog.find(
+    (item) => item.id === "PRED-20260905-001" && item.version === 1,
+  );
+  assert.ok(first);
   assert.equal(
     predictionState(first, Date.parse("2026-09-05T02:59:59Z")),
     "upcoming",
