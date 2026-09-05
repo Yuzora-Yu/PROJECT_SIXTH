@@ -5,8 +5,6 @@ import {
   dayKey,
   senseStats,
   emptySenses,
-  patternQuestions,
-  scorePattern,
   astrology,
 } from "../shared/core.js";
 import {
@@ -17,7 +15,29 @@ import {
 import { newPlayer, perform, publicPlayer } from "../worker/game.js";
 import { senseBonuses, simulateBattle } from "../js/battle/prisma-adapter.js";
 import { characters } from "../shared/roster.js";
+import { predictionCatalog, predictionState } from "../worker/predictions.js";
 const time = Date.parse("2026-09-04T02:00:00Z");
+test("prediction catalog contains only valid release entries and honors JST windows", () => {
+  assert.equal(predictionCatalog.length, 6);
+  assert.ok(
+    predictionCatalog.every(
+      (item) => item.choices.length >= 2 && item.choices.length <= 4,
+    ),
+  );
+  const first = predictionCatalog[0];
+  assert.equal(
+    predictionState(first, Date.parse("2026-09-05T02:59:59Z")),
+    "upcoming",
+  );
+  assert.equal(
+    predictionState(first, Date.parse("2026-09-05T03:00:00Z")),
+    "open",
+  );
+  assert.equal(
+    predictionState(first, Date.parse("2026-09-12T04:59:00Z")),
+    "closed",
+  );
+});
 test("JST 04:00 is the day boundary, including year rollover", () => {
   assert.equal(dayKey(Date.parse("2026-09-03T18:59:59Z")), "2026-09-03");
   assert.equal(dayKey(Date.parse("2026-09-03T19:00:00Z")), "2026-09-04");

@@ -1,65 +1,85 @@
-# 配信記録 — 2026-09-04
+# 配信記録 — 2026-09-05
 
 公開URL: https://yu-zora.com/project_sixth/
 
-- アプリ: v0.3.3
+- アプリ / 公開API: v0.4.0
 - Worker: `project-sixth`
-- Worker version: `1267d8d1-4975-4a2d-ae9e-7389f1b1836b`
-- D1: `project-sixth` / `410a83bb-0907-4ac0-8a1c-110152eba20e`
-- Migration: `0001_initial.sql` 適用済み
-- Routes: `yu-zora.com/project_sixth`、`yu-zora.com/project_sixth/*`
+- Worker version: `df50a215-0276-404d-8b8a-6604a19d79ae`
+- Worker version作成: 2026-09-05 14:11:49 JST
+- D1: `project-sixth` / `410a83bb-0907-4ac0-8a1c-110152eba20e`（既存）
+- Bindings: 既存のD1 `DB` と静的アセット `ASSETS` のみ
+- Routes: `yu-zora.com/project_sixth`、`yu-zora.com/project_sixth/*`（既存ルートを維持）
 
-既存の `/games/Prisma-Abyss/*` などのルートは維持。DNS・既存ゲームのWorker・既存DBは変更していません。匿名セッションCookieはSecure / HttpOnly / SameSite=Strict、Pathは `/project_sixth/`。
+## v0.4.0の配信内容
 
-HTMLに `Cache-Control: public, max-age=0, must-revalidate, no-transform` を付与。ドメイン全体の自動分析スクリプト挿入と、このアプリの同一オリジン限定CSPとの競合を解消しています。この設定はPROJECT SIXTHのHTMLだけに適用。
+- 「現実予測」を公開。prediction catalogはv2.2.0で、公開6件・受付中6件を配信しています。
+- 公開日時、受付期限、予測ID・版、選択肢をサーバー側で照合し、匿名セッションの回答を保存・再取得できるようにしました。予測回答によるRC・経験値・報酬はありません。
+- 360px・390px幅と文字拡大時に、下部メニュー、見出し、カード本文が不自然に分断されたり横にはみ出したりしないよう調整しました。
+- 数秘・MBTI・惑星配置と研究記録に対する「研究員の所見」を、自然で簡潔な日本語へ調整しました。
+- リポジトリ直下の `AGENTS.md` で `pink-elephant-guard` を必須スキルに指定し、却下・削除・修正済みの表現を閲覧者向け成果物へ再登場させない運用を明文化しました。
 
-## 確認結果
+## v0.4.0の確認結果
 
-- ユニット・APIテスト: 33件成功
-- Edgeブラウザ: 4シナリオ成功（30秒粒子試験、離脱時の再試行、Daily、召喚、戦闘、訓練、プロフィール、スマホ幅）
-- 公開URL: HTTP 200、末尾スラッシュなしから308リダイレクト
-- 公開環境でDaily報酬がリロード後も保存されることを確認
-- 公開環境で訓練終了直後の記録更新、PNG生成・保存を確認
-- 数秘11、10天体、出生時刻・UTC差、任意MBTI日本語名、総合補正と10%初期値反映・置換・解除を確認
-- 26枠の仲間、未取得シルエット、初期6人からの選択、誕生日の月日表示を確認
-- 任意名・研究開始日・総研究日数・Daily成績を研究共有画像に集約
-- 出生日時がゲームAPIへ送られないことを確認。初期値反映時だけ数秘・MBTI・星座区分を計算用に送り、サーバーでは補正値のみ保存
-- 共有PNGを目視確認（数秘レーダー・総合プロフィール・研究記録）
-- 公開環境でページ例外・コンソールエラーなし
-- 既存PRISMA ABYSS配信URLもHTTP 200
+- 公開APIのversionがv0.4.0であることを確認。
+- 公開APIのprediction catalogがv2.2.0、公開6件・受付中6件であることを確認。
+- 新規匿名セッションで現実予測へ回答し、再取得後も選択内容が保存されていることを本番環境で確認。
+- Pythonテスト: 4件中4件成功。
+- Nodeテスト: 34件中34件成功。
+- Playwright: 8件中8件成功。現実予測、スマホ幅・文字拡大、30秒粒子試験、プロフィールと共有画像を含みます。
 
-検証用の匿名プレイヤーで本番の保存確認を行いました。ユーザーのローカル試遊データは本番へ移行していません。
+## Cloudflareの構成と料金方針
 
-## v0.3.1の追加確認
+今回の配信では既存Worker、既存D1、既存静的アセット、既存ルートだけを使用しました。新しいCloudflare資源、D1 migration、有料機能、有料プラン、追加の請求設定は作成・適用していません。
 
-- PCクリック・スマホ幅のタップの2シナリオを実行。緑の発見表示・粒子消去・ライブカウンターを確認
-- 正常範囲の入力は誤検知、0.5秒以内の入力は待ち表示となりカウントされないことを確認
-- 画面に描かれたフレーム時刻と同じ座標判定をサーバーへ渡し、途中のカウンターと終了時の採点を照合
-- 動きの軽減設定と枠線を除いた座標変換を確認
+今後もWorkers・D1などの無料枠内で運用し、ドメイン料を除く追加料金が必要になる操作は実行前に停止します。利用量と仕様はCloudflareの[Workers料金](https://developers.cloudflare.com/workers/platform/pricing/)および[D1料金](https://developers.cloudflare.com/d1/platform/pricing/)の公式情報で確認します。
+
+GitHub Pagesは使用しません。GitHub Actionsは検証のみで、自動デプロイ用トークンは設定していません。
 
 ## 更新手順
 
 ```powershell
 npm ci
-npx wrangler d1 migrations apply project-sixth --remote
+npm run predictions:check
+npm run check
 npm run deploy
 ```
 
-GitHub Pagesは使用しません。GitHub Actionsは検証のみで、自動デプロイ用トークンは設定していません。
+v0.4.0ではD1 migrationを追加していません。
 
-## 一次資料
+## 過去の配信履歴
 
-- [Workers Routes](https://developers.cloudflare.com/workers/configuration/routing/routes/)
-- [Cloudflare Web Analytics FAQ — no-transform](https://developers.cloudflare.com/web-analytics/faq/)
-- [Astronomy Engine JavaScript](https://github.com/cosinekitty/astronomy/tree/master/source/js)
+### v0.3.3 — 2026-09-04
 
-## v0.3.2の追加確認
+- アプリ: v0.3.3
+- Worker version: `1267d8d1-4975-4a2d-ae9e-7389f1b1836b`
+- 公開環境で仲間一覧26人、召喚の全26名表示、保留対象の名前が画面に出ないことを確認。ブラウザ例外なし。
+- 元の30件のマスタと既存の所持・育成記録は保持。公開対象の操作制限と、開始済み戦闘の精算をユニットテストで確認。
+
+### v0.3.2
 
 - 数秘／総合タブをマウス・左右キーで切り替え、390px幅でも横にはみ出さないことを確認。
 - 数秘・MBTI・惑星配置を含む3段落の所見と、全文を含む総合PNG（確認例1080×1817）を公開環境で確認。ブラウザ例外なし。
 - 粒子ルールv5のPC・スマホ入力、30秒終了時のサーバー保存との一致をローカルで確認。公開配信でもv5とシードごとの方向差を確認。
 
-## v0.3.3の追加確認
+### v0.3.1
 
-- 公開環境で仲間一覧26人、召喚の全26名表示、保留対象の名前が画面に出ないことを確認。ブラウザ例外なし。
-- 元の30件のマスタと既存の所持/育成記録は保持。公開対象の操作制限と、開始済み戦闘の精算をユニットテストで確認。
+- PCクリック・スマホ幅のタップの2シナリオを実行。緑の発見表示・粒子消去・ライブカウンターを確認。
+- 正常範囲の入力は誤検知、0.5秒以内の入力は待ち表示となりカウントされないことを確認。
+- 画面に描かれたフレーム時刻と同じ座標判定をサーバーへ渡し、途中のカウンターと終了時の採点を照合。
+- 動きの軽減設定と枠線を除いた座標変換を確認。
+
+### v0.3.0以前
+
+- Migration `0001_initial.sql` 適用済み。
+- 匿名セッションCookieはSecure / HttpOnly / SameSite=Strict、Pathは `/project_sixth/`。
+- HTMLに `Cache-Control: public, max-age=0, must-revalidate, no-transform` を付与し、同一オリジン限定CSPとの競合を解消。この設定はPROJECT SIXTHのHTMLだけに適用。
+- 公開URLのHTTP 200と末尾スラッシュなしからの308リダイレクト、Daily報酬・訓練記録の保存、共有PNG、数秘11、10天体、任意MBTI、総合補正、26枠の仲間を確認。
+- 既存の `/games/Prisma-Abyss/*` などのルート、DNS、既存ゲームのWorker、既存DBは変更していません。
+
+## 一次資料
+
+- [Workers Routes](https://developers.cloudflare.com/workers/configuration/routing/routes/)
+- [Workers料金](https://developers.cloudflare.com/workers/platform/pricing/)
+- [D1料金](https://developers.cloudflare.com/d1/platform/pricing/)
+- [Cloudflare Web Analytics FAQ — no-transform](https://developers.cloudflare.com/web-analytics/faq/)
+- [Astronomy Engine JavaScript](https://github.com/cosinekitty/astronomy/tree/master/source/js)

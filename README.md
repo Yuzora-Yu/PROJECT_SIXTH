@@ -1,6 +1,6 @@
 # 第六感強化計画-PROJECT SIXTH-
 
-被験者として「察知・予見・洞察・感応・共鳴」を観測し、キャラクター育成へつなぐブラウザゲーム。v0.3.3のMVPです。
+被験者として「察知・予見・洞察・感応・共鳴」を観測し、キャラクター育成へつなぐブラウザゲーム。v0.4.0のMVPです。
 
 公開先: https://yu-zora.com/project_sixth/
 
@@ -32,8 +32,16 @@ npm run dev
 - 最初の仲間をジョセフ・リュウ・アルス（冒険者）・アリサ・サラ・ソフィアから1人選択。未取得はシルエット
 - 数秘、総合プロフィール、研究記録の3種類でPNG作成・X投稿画面・端末の共有メニュー
 - 高コントラスト、文字拡大、スマホ縦持ち、動きの軽減設定への対応
+- 公開審査済みの出来事へ回答する「現実予測」。匿名プレイヤー記録へ選択を保存し、締切まで変更、結果確定後に照合
 
-現実予測・レイド・予測カレンダーは「開発中」。投票、オッズ、外部AI、予測用API、運用Excelの取り込みは実装していません。
+現実予測は、運用台帳の `status=APPROVED_FOR_PUBLISH` かつ `publish_gate=READY` を満たし、公開時刻を迎えた問題だけをアプリ用カタログへ反映します。報酬・オッズ・参加率は扱わず、ユーザーアクセス時に外部AIを呼び出しません。週末共同レイドは開発中です。
+
+運用台帳の最新版をローカル専用の `ops/PROJECT_SIXTH_GeminiSpark_Prediction_Ops.xlsx` へコピーしたあと、次のコマンドで公開カタログを更新します。xlsxはGitの追跡対象外です。公開済みのID・version・問題文・選択肢・判定条件を削除または上書きする更新は拒否されます。
+
+```powershell
+npm run predictions:import
+npm run predictions:check
+```
 
 ## 検証
 
@@ -77,6 +85,6 @@ X用ハッシュタグは `#第六感強化計画 #PROJECTSIXTH`。PNGは端末�
 - [Gemini Spark 現実予測運用仕様](docs/GEMINI_SPARK_OPERATIONS.md)
 - [現実予測 情報源ポリシー](docs/PREDICTION_SOURCE_POLICY.md)
 - [Gemini Spark Skills / Tasks](gemini-spark/README.md)
-- [現実予測 運用スプレッドシート](ops/PROJECT_SIXTH_GeminiSpark_Prediction_Ops.xlsx)
+- 現実予測 運用スプレッドシート（ローカル専用: `ops/PROJECT_SIXTH_GeminiSpark_Prediction_Ops.xlsx`）
 
 PRISMA ABYSSはRead Only。アセット・マスタはPROJECT_SIXTH内へコピーしたものだけを利用します。元プロジェクトのセーブキー・API・グローバル変数には依存しません。

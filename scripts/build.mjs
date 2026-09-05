@@ -1,7 +1,10 @@
-import { cp, mkdir, readFile, writeFile, readdir } from "node:fs/promises";
+import { cp, mkdir, readFile, writeFile, readdir, rm } from "node:fs/promises";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 const root = path.resolve(import.meta.dirname, "..");
+const dist = path.join(root, "dist");
+if (!dist.startsWith(root + path.sep))
+  throw new Error("dist directory escaped the project root");
 await import("./prepare-vendor.mjs");
 for (const dir of ["shared", "js", "worker", "scripts"]) {
   async function check(folder) {
@@ -18,6 +21,7 @@ for (const dir of ["shared", "js", "worker", "scripts"]) {
   }
   await check(path.join(root, dir));
 }
+await rm(dist, { recursive: true, force: true });
 await mkdir(path.join(root, "dist/data/prisma"), { recursive: true });
 for (const f of ["index.html", "css", "js", "shared", "assets", "vendor"])
   await cp(path.join(root, f), path.join(root, "dist", f), { recursive: true });

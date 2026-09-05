@@ -1,13 +1,16 @@
 {
   "name": "project-sixth",
-  "version": "0.3.3",
+  "version": "0.4.0",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "node scripts/dev-server.mjs",
+    "predictions:import": "python scripts/import-predictions.py",
+    "predictions:check": "python scripts/import-predictions.py --check",
+    "test:predictions-import": "python -m unittest tests/test_import_predictions.py",
     "build": "node scripts/build.mjs",
     "test": "node --test tests/*.test.mjs",
-    "check": "npm run test && npm run build",
+    "check": "npm run test:predictions-import && npm run test && npm run build",
     "dev:worker": "npm run build && wrangler dev",
     "db:local": "wrangler d1 migrations apply project-sixth --local",
     "deploy:check": "npm run build && wrangler deploy --dry-run",
@@ -15,7 +18,7 @@
     "format": "prettier --write index.html css js shared worker scripts tests docs/*.md README.md package.json playwright.config.js wrangler.jsonc .github",
     "predev": "node scripts/prepare-vendor.mjs",
     "pretest": "node scripts/prepare-vendor.mjs",
-    "deploy": "npm run check && wrangler deploy"
+    "deploy": "npm run predictions:check && npm run check && wrangler deploy"
   },
   "engines": {
     "node": ">=24.0.0"

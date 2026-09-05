@@ -96,13 +96,12 @@
 - `tests/particle-feedback.test.mjs`: 即時判定と最終採点の一致・境界判定
 - `tests/particle-feedback.spec.js`: PCとスマホ幅の入力・表示・保存
 
-## 2026-09-04 現実予測運用設計で追加（release 2.1.0）
+## 2026-09-04 現実予測運用設計で追加（初版release 2.1.0）
 
 - `docs/GEMINI_SPARK_OPERATIONS.md`
 - `docs/PREDICTION_SOURCE_POLICY.md`
 - `docs/OPERATIONS.md`
-- `ops/PROJECT_SIXTH_GeminiSpark_Prediction_Ops.xlsx` — canonical workbook base
-- `spreadsheet/PROJECT_SIXTH_GeminiSpark_Prediction_Ops_v2.xlsx` — compatibility mirror
+- `ops/PROJECT_SIXTH_GeminiSpark_Prediction_Ops.xlsx` — ローカル運用正本（現在release 2.2.0、Git管理外）
 - `gemini-spark/README.md`
 - `gemini-spark/ops_contract.json`
 - `gemini-spark/tasks/TASKS.md` — task index / schedule
@@ -124,3 +123,12 @@
 
 - `shared/roster.js` — マスタを保持した公開対象の選定。
 - `tests/roster.test.mjs` — 召喚・操作制限・既存進行の保持を検証。
+
+## v0.4.0の追加ファイル
+
+- `AGENTS.md` / `.agents/skills/pink-elephant-guard/` — 表示物更新時の必須Skill。
+- `scripts/import-predictions.py` — 運用xlsxを検証し、公開可能な行だけを決定的に抽出。
+- `worker/prediction-catalog.generated.js` — release 2.2.0から生成したWorker専用カタログ。
+- `worker/predictions.js` — カタログ検証、公開期間、結果状態を扱うドメイン層。
+- `tests/mobile-layout.spec.js` — 360/390pxと文字拡大時の改行・下部メニュー・横あふれを検証。
+- `tests/test_import_predictions.py` — 公開時刻境界と時刻入力を検証。

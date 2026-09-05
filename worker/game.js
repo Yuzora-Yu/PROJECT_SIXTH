@@ -12,6 +12,14 @@ import {
 import { scoreParticles } from "../shared/particles.js";
 import { characters, isAvailableCharacter } from "../shared/roster.js";
 import { calculateProfile } from "../shared/profile-model.js";
+import {
+  findPrediction,
+  predictionCatalog,
+  predictionCatalogVersion,
+  predictionCategories,
+  predictionKey,
+  predictionState,
+} from "./predictions.js";
 export const starterIds = [101, 107, 301, 108, 110, 202];
 import { simulateBattle } from "../js/battle/prisma-adapter.js";
 export class GameError extends Error {
@@ -41,8 +49,65 @@ export function newPlayer(id, ms) {
     battleCount: 0,
     battleHistory: [],
     pendingBattle: null,
+    predictions: {},
   };
 }
+
+export function publicPredictions(p, ms) {
+  const saved = p.predictions || {};
+  const items = predictionCatalog
+    .filter((item) => ms >= Date.parse(item.publishAt))
+    .map((item) => {
+      const state = predictionState(item, ms);
+      const selection = saved[predictionKey(item)] || null;
+      const result =
+        state === "settled"
+          ? {
+              optionId: item.finalResult,
+              label: item.choices.find(
+                (choice) => choice.id === item.finalResult,
+              )?.label,
+            }
+          : null;
+      return {
+        id: item.id,
+        version: item.version,
+        category: item.category,
+        categoryLabel: predictionCategories[item.category],
+        horizon: item.horizon,
+        question: item.question,
+        choices: item.choices,
+        resolutionRule: item.resolutionRule,
+        publishAt: item.publishAt,
+        closeAt: item.closeAt,
+        resultDueAt: item.resultDueAt,
+        source: item.source,
+        state,
+        selection,
+        result,
+        correct:
+          result && selection ? result.optionId === selection.optionId : null,
+      };
+    });
+  const settled = items.filter((item) => item.state === "settled");
+  const answeredSettled = settled.filter((item) => item.selection);
+  const nextChange = predictionCatalog
+    .flatMap((item) => [item.publishAt, item.closeAt])
+    .map((value) => ({ value, ms: Date.parse(value) }))
+    .filter((change) => change.ms > ms)
+    .sort((a, b) => a.ms - b.ms)[0];
+  return {
+    catalogVersion: predictionCatalogVersion,
+    items,
+    nextChangeAt: nextChange?.value || null,
+    stats: {
+      recorded: items.filter((item) => item.selection).length,
+      settled: answeredSettled.length,
+      correct: answeredSettled.filter((item) => item.correct).length,
+    },
+  };
+}
+
 export function publicPlayer(p, ms) {
   const day = dayKey(ms),
     status = {};
@@ -137,6 +202,34 @@ export function perform(p, path, body, ms) {
     p.profileBonus = profile?.bonus || null;
     // Store only bounded game bonuses, never birth date, time, or personality input.
     return { bonus: p.profileBonus || emptySenses() };
+  }
+  const predictionMatch = path.match(
+    /^\/api\/predictions\/(PRED-\d{8}-\d{3})\/vote$/,
+  );
+  if (predictionMatch) {
+    assert(Number.isInteger(body.version), "予測versionを確認してください。");
+    const item = findPrediction(predictionMatch[1], body.version);
+    assert(item, "予測問題が見つかりません。", 404);
+    assert(
+      predictionState(item, ms) === "open",
+      "この予測は現在受け付けていません。",
+      409,
+    );
+    assert(
+      typeof body.optionId === "string" &&
+        item.choices.some((choice) => choice.id === body.optionId),
+      "選択肢を確認してください。",
+    );
+    p.predictions ||= {};
+    const key = predictionKey(item);
+    const previous = p.predictions[key];
+    const selection = {
+      optionId: body.optionId,
+      selectedAt: previous?.selectedAt || iso(ms),
+      updatedAt: iso(ms),
+    };
+    p.predictions[key] = selection;
+    return { predictionId: item.id, version: item.version, selection };
   }
   if (path === "/api/character/starter") {
     assert(!p.starterChosen, "最初の仲間は登録済みです。", 409);

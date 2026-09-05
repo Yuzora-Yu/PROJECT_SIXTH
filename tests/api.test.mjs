@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import { localDatabase } from "../scripts/sqlite.mjs";
 import { handleApi } from "../worker/api.js";
 const time = Date.parse("2026-09-04T02:00:00Z");
-async function session() {
+async function session(at = time) {
   const db = localDatabase();
   db.native.exec(
     readFileSync(
@@ -17,12 +17,13 @@ async function session() {
       headers: { "X-Sixth-Client": "1" },
     }),
     db,
-    () => time,
+    () => at,
   );
   return {
     db,
     cookie: r.headers.get("set-cookie").split(";")[0],
     bootstrap: await r.json(),
+    now: at,
   };
 }
 async function call(s, path, body, key = crypto.randomUUID(), headers = {}) {
@@ -40,7 +41,7 @@ async function call(s, path, body, key = crypto.randomUUID(), headers = {}) {
       ...(body ? { body: JSON.stringify(body) } : {}),
     }),
     s.db,
-    () => time,
+    () => s.now,
   );
   return { status: r.status, data: await r.json() };
 }
@@ -108,11 +109,53 @@ test("Daily secret never returned before selection, concurrent answers reward on
   assert.equal((await call(s, "/api/daily/card/start", {})).status, 409);
   s.db.native.close();
 });
-test("future prediction and raid have no mutation endpoints", async () => {
-  const s = await session();
+test("published predictions load, save one bounded choice and never change RC", async () => {
+  const s = await session(Date.parse("2026-09-05T02:59:59Z"));
+  const hidden = await call(s, "/api/predictions");
+  assert.equal(hidden.data.predictions.items.length, 0);
+  s.now = Date.parse("2026-09-05T04:30:00Z");
+  const feed = await call(s, "/api/predictions");
+  assert.equal(feed.status, 200);
+  assert.equal(feed.data.predictions.items.length, 6);
   assert.equal(
-    (await call(s, "/api/predictions/x/vote", { optionId: "A" })).status,
-    404,
+    feed.data.predictions.items.find((item) => item.id.endsWith("008")).choices
+      .length,
+    2,
+  );
+  assert.equal(feed.data.predictions.items[0].state, "open");
+  assert.ok(!JSON.stringify(feed.data).includes("publish_gate"));
+  assert.ok(!JSON.stringify(feed.data).includes("gitPublishKey"));
+  assert.equal(
+    (
+      await call(s, "/api/predictions/PRED-20260905-001/vote", {
+        version: 1,
+        optionId: "Z",
+      })
+    ).status,
+    400,
+  );
+  const first = await call(s, "/api/predictions/PRED-20260905-001/vote", {
+    version: 1,
+    optionId: "A",
+  });
+  assert.equal(first.status, 200);
+  assert.equal(first.data.player.rc, 300);
+  assert.equal(first.data.predictions.stats.recorded, 1);
+  const changed = await call(s, "/api/predictions/PRED-20260905-001/vote", {
+    version: 1,
+    optionId: "B",
+  });
+  assert.equal(changed.data.result.selection.optionId, "B");
+  assert.equal(changed.data.player.rc, 300);
+  s.now = Date.parse("2026-09-12T05:00:00Z");
+  assert.equal(
+    (
+      await call(s, "/api/predictions/PRED-20260905-001/vote", {
+        version: 1,
+        optionId: "A",
+      })
+    ).status,
+    409,
   );
   assert.equal((await call(s, "/api/raid/attack", {})).status, 404);
   assert.equal((await call(s, "/api/me")).data.player.rc, 300);

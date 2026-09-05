@@ -1,6 +1,12 @@
 import { config } from "../shared/config.js";
 import { now, iso, dayKey } from "../shared/core.js";
-import { newPlayer, publicPlayer, perform, GameError } from "./game.js";
+import {
+  newPlayer,
+  publicPlayer,
+  publicPredictions,
+  perform,
+  GameError,
+} from "./game.js";
 const json = (data, status = 200, headers = {}) =>
   Response.json(
     { version: config.gameVersion, ...data },
@@ -118,6 +124,15 @@ export async function handleApi(request, db, clock = now, cookiePath = "/") {
         200,
         headers,
       );
+    if (request.method === "GET" && url.pathname === "/api/predictions")
+      return json(
+        {
+          serverTime: iso(ms),
+          predictions: publicPredictions(p, ms),
+        },
+        200,
+        headers,
+      );
     if (request.method !== "POST")
       throw new GameError("この操作は利用できません。", 405);
     const body = await readBody(request),
@@ -139,6 +154,9 @@ export async function handleApi(request, db, clock = now, cookiePath = "/") {
           result: JSON.parse(previous.result),
           player: publicPlayer(p, ms),
           serverTime: iso(ms),
+          ...(url.pathname.startsWith("/api/predictions/")
+            ? { predictions: publicPredictions(p, ms) }
+            : {}),
         },
         200,
         headers,
@@ -172,7 +190,14 @@ export async function handleApi(request, db, clock = now, cookiePath = "/") {
         409,
       );
     return json(
-      { result, player: publicPlayer(p, ms), serverTime: iso(ms) },
+      {
+        result,
+        player: publicPlayer(p, ms),
+        serverTime: iso(ms),
+        ...(url.pathname.startsWith("/api/predictions/")
+          ? { predictions: publicPredictions(p, ms) }
+          : {}),
+      },
       200,
       headers,
     );

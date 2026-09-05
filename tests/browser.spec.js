@@ -66,10 +66,23 @@ test("desktop and phone journeys, daily/training, summon, battle, privacy and re
   expect(outbound.every((s) => !s.includes("2000-02-29"))).toBeTruthy();
   await page.locator('[data-action="birth-clear"]').click();
   await expect(page.locator("#birth-date")).toHaveValue("");
-  await page.goto("/#home");
-  await page.locator('#main [data-action="coming"]').click({ force: true });
-  await expect(page.locator("#dialog-title")).toHaveText("開発中");
-  await page.keyboard.press("Escape");
+  await page.goto("/#prediction");
+  await expect(page.getByRole("heading", { name: "現実予測" })).toBeVisible();
+  await expect(page.locator(".prediction-card")).toHaveCount(6);
+  await expect(page.locator("#main")).not.toContainText("開発中");
+  const firstPrediction = page.locator(".prediction-card").first();
+  const firstChoice = firstPrediction.locator(".prediction-choice").first();
+  await firstChoice.click();
+  await expect(firstChoice).toHaveAttribute("aria-pressed", "true");
+  await expect(firstPrediction).toContainText("記録済み");
+  await page.reload();
+  await expect(
+    page
+      .locator(".prediction-card")
+      .first()
+      .locator(".prediction-choice")
+      .first(),
+  ).toHaveAttribute("aria-pressed", "true");
   await page.setViewportSize({ width: 390, height: 844 });
   await page.evaluate(() => window.scrollTo(0, 0));
   await page.screenshot({

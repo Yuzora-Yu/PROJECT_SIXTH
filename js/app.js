@@ -28,7 +28,9 @@ let player = null,
   route = "home",
   busy = false,
   battleCharacter = 101;
-let observedDay = null;
+let observedDay = null,
+  predictionData = null,
+  predictionRefreshTimer = null;
 const labs = [
   {
     id: "card",
@@ -51,14 +53,14 @@ const labs = [
 ];
 const starterIds = [101, 107, 301, 108, 110, 202];
 const navs = [
-  ["home", "⌂", "ホーム", "HOME"],
-  ["daily", "◈", "デイリーテスト", "DAILY TEST"],
-  ["training", "⠿", "トレーニング", "TRAINING"],
-  ["prediction", "◷", "現実予測", "PREDICTION"],
-  ["battle", "⚔", "戦闘実験", "BATTLE"],
-  ["characters", "♙", "キャラクター", "CHARACTER"],
-  ["analyze", "⌁", "被験結果解析", "ANALYZE"],
-  ["archive", "▦", "観測記録", "ARCHIVE"],
+  ["home", "⌂", "ホーム", "HOME", "ホーム"],
+  ["daily", "◈", "デイリーテスト", "DAILY TEST", "デイリー"],
+  ["training", "⠿", "トレーニング", "TRAINING", "訓練"],
+  ["prediction", "◷", "現実予測", "PREDICTION", "予測"],
+  ["battle", "⚔", "戦闘実験", "BATTLE", "戦闘"],
+  ["characters", "♙", "キャラクター", "CHARACTER", "仲間"],
+  ["analyze", "⌁", "被験結果解析", "ANALYZE", "解析"],
+  ["archive", "▦", "観測記録", "ARCHIVE", "記録"],
 ];
 const char = (id) =>
   characters.find((c) => c.id === Number(id)) || characters[0];
@@ -70,8 +72,8 @@ function intro(eyebrow, title, desc) {
 function renderNav() {
   document.querySelector("#navigation").innerHTML = navs
     .map(
-      ([id, symbol, label]) =>
-        `<a href="#${id}" ${id === "prediction" ? 'data-action="coming" aria-disabled="true"' : ""} class="nav-link ${route === id ? "active" : ""} ${["prediction", "characters", "archive"].includes(id) ? "mobile-hide" : ""} ${id === "prediction" ? "locked" : ""}" ${route === id ? 'aria-current="page"' : ""}><span class="nav-symbol" aria-hidden="true">${symbol}</span><span>${label}</span>${id === "prediction" ? '<span class="lock-label">開発中</span>' : ""}</a>`,
+      ([id, symbol, label, , shortLabel]) =>
+        `<a href="#${id}" class="nav-link ${route === id ? "active" : ""} ${["characters", "archive"].includes(id) ? "mobile-hide" : ""}" ${route === id ? 'aria-current="page"' : ""}><span class="nav-symbol" aria-hidden="true">${symbol}</span><span class="nav-label">${label}</span><span class="nav-label-short">${shortLabel}</span></a>`,
     )
     .join("");
 }
@@ -117,7 +119,7 @@ function home() {
   <div class="wide-links"><button class="feature-link" data-action="training"><span class="feature-icon">⠿</span><span><h3>トレーニング</h3><p>気が済むまで、観測しよう。</p></span><span class="arrow">↗</span></button><button class="feature-link" data-action="battle"><span class="feature-icon">⚔</span><span><h3>戦闘実験</h3><p>本日 残り ${player?.battleRemaining ?? "—"} / 5 回</p></span><span class="arrow">↗</span></button></div></div>
   <div class="right-column"><section class="panel chart-panel"><div class="chart-heading"><h2>第六感プロファイル</h2><small>SUBJECT DATA</small></div>${stats ? radar(stats) : '<p class="muted">研究値は接続後に表示されます。</p>'}<div class="stat-strip">${config.senses.map((k) => `<span>${config.labels[k]}<b>${stats?.[k] ?? "—"}</b></span>`).join("")}</div><div class="condition"><span><span class="live-dot"></span>本日のコンディション</span><b>+${Math.round(player?.condition || 0)}</b></div>${button("被験結果を解析する　↗", "analyze", "text-button")}</section>
   <section class="panel character-panel"><img src="${c.image}" alt="${c.name}"><div class="character-copy"><span class="eyebrow">YOUR PARTNER</span><h2>${c.name}</h2><p>${c.job} / LV.${1 + Math.floor((player?.characters[c.id]?.exp || 0) / 60)}<br>得意な第六感：${config.labels[c.primarySense]}</p>${button("キャラクターへ　↗", "characters", "secondary")}</div></section></div></div>
-  <div class="future-strip"><span>◷　REAL PREDICTION <small>現実世界で、直感を試す。</small></span>${button("開発中", "coming", "secondary", 'aria-disabled="true"')}</div>`;
+  <div class="future-strip"><span>◷　REAL PREDICTION <small>現実世界で、直感を記録する。</small></span>${button("予測を見る　→", "prediction", "secondary")}</div>`;
 }
 function labPage(training) {
   const list = local.get("training", []);
@@ -143,14 +145,83 @@ function labPage(training) {
   );
 }
 function future() {
+  const data = predictionData;
+  if (!data)
+    return (
+      intro(
+        "FIELD TEST",
+        "現実予測",
+        "結果が確定していない出来事に、いまの直感で答える実地試験です。",
+      ) +
+      `<section class="empty-state"><span class="symbol">◷</span><h2>予測データを取得できませんでした。</h2><p class="muted">通信状態を確認して、もう一度接続してください。</p>${button("再接続", "reconnect", "secondary")}</section>`
+    );
+  const open = data.items.filter((item) => item.state === "open").length;
+  const statusTitle = open
+    ? `${open}件を受付中`
+    : data.items.length
+      ? "現在は結果待ちです"
+      : data.nextChangeAt
+        ? `${formatJst(data.nextChangeAt)}に受付開始`
+        : "現在受付中の予測はありません";
   return (
     intro(
       "FIELD TEST",
       "現実予測",
-      "現実世界の未確定な出来事を使った実地試験。",
+      "結果が確定していない出来事に、いまの直感で答える実地試験です。",
     ) +
-    `<section class="empty-state"><span class="symbol">◷</span><h2>開発中</h2><p class="muted">今後のアップデートで解放予定です。</p>${button("研究所ロビーへ", "home", "secondary")}</section>`
+    `<section class="panel prediction-overview"><div><span class="eyebrow">OBSERVATION STATUS</span><h2>${statusTitle}</h2><p>選択は締切まで変更できます。結果が確定すると、ここで記録と照合します。</p></div><div class="prediction-stats"><span>記録済み<b>${data.stats.recorded}</b></span><span>照合済み<b>${data.stats.settled}</b></span><span>的中<b>${data.stats.settled ? `${data.stats.correct}/${data.stats.settled}` : "—"}</b></span></div></section>` +
+    `<div class="prediction-list">${data.items.map(predictionCard).join("")}</div>`
   );
+}
+
+const predictionStatus = {
+  upcoming: "受付前",
+  open: "受付中",
+  closed: "結果待ち",
+  settled: "結果確定",
+};
+const jstDateTime = new Intl.DateTimeFormat("ja-JP", {
+  timeZone: config.timezone,
+  year: "numeric",
+  month: "numeric",
+  day: "numeric",
+  hour: "2-digit",
+  minute: "2-digit",
+  hour12: false,
+});
+const formatJst = (value) => `${jstDateTime.format(Date.parse(value))} JST`;
+
+function predictionCard(item) {
+  const selected = item.selection?.optionId;
+  const selectedChoice = item.choices.find((choice) => choice.id === selected);
+  const resultChoice = item.choices.find(
+    (choice) => choice.id === item.result?.optionId,
+  );
+  const stateNote =
+    item.state === "upcoming"
+      ? `${formatJst(item.publishAt)}から受け付けます。`
+      : item.state === "open"
+        ? selectedChoice
+          ? `「${escape(selectedChoice.label)}」で記録済みです。締切までは変更できます。`
+          : "直感に近いものを、ひとつ選んでください。"
+        : item.state === "settled"
+          ? selectedChoice
+            ? `あなたの記録：${escape(selectedChoice.label)} ／ 結果：${escape(resultChoice?.label || "確認中")}`
+            : `結果：${escape(resultChoice?.label || "確認中")}`
+          : selectedChoice
+            ? `あなたの記録：${escape(selectedChoice.label)}`
+            : "受付は終了しました。";
+  const sourceUrl = /^https:\/\//.test(item.source?.url || "")
+    ? escape(item.source.url)
+    : "";
+  return `<section class="panel prediction-card ${item.state}"><div class="prediction-card-head"><span class="prediction-category">${escape(item.categoryLabel)}</span><span class="prediction-state">${predictionStatus[item.state]}</span></div><h2>${escape(item.question)}</h2><div class="prediction-deadline"><span>受付締切</span><b>${formatJst(item.closeAt)}</b></div><div class="prediction-choices">${item.choices
+    .map(
+      (choice) =>
+        `<button class="prediction-choice ${selected === choice.id ? "selected" : ""}" data-action="prediction-vote-${item.id}-v${item.version}-${choice.id}" aria-pressed="${selected === choice.id}" ${item.state === "open" ? "" : "disabled"}><span>${choice.id}</span><b>${escape(choice.label)}</b>${selected === choice.id ? "<small>記録済み</small>" : ""}</button>`,
+    )
+    .join(
+      "",
+    )}</div><p class="prediction-note ${item.correct === true ? "correct" : item.correct === false ? "incorrect" : ""}">${stateNote}</p><details class="prediction-rule"><summary>判定方法と情報源</summary><p>${escape(item.resolutionRule)}</p>${sourceUrl ? `<a href="${sourceUrl}" target="_blank" rel="noopener noreferrer">${escape(item.source.name)}　↗</a>` : ""}<p class="small muted">結果確認予定：${formatJst(item.resultDueAt)}</p></details></section>`;
 }
 function charactersPage() {
   return (
@@ -321,13 +392,31 @@ function archivePage() {
           })
           .join("")}</div>`
       : '<div class="empty-state"><h2>まだ観測記録がありません。</h2><p class="muted">最初の試験から始めましょう。</p></div>') +
-    `<div class="future-strip"><span>予測記録カレンダー</span>${button("開発中", "coming", "secondary", 'aria-disabled="true"')}</div>`
+    predictionArchive()
   );
+}
+function predictionArchive() {
+  const saved = (predictionData?.items || []).filter((item) => item.selection);
+  if (!predictionData)
+    return `<section class="panel prediction-log"><div><span class="eyebrow">FIELD TEST LOG</span><h2>現実予測の記録</h2><p class="muted">接続すると記録を確認できます。</p></div>${button("再接続", "reconnect", "secondary")}</section>`;
+  return `<section class="panel prediction-log"><div><span class="eyebrow">FIELD TEST LOG</span><h2>現実予測の記録</h2>${
+    saved.length
+      ? `<div class="prediction-log-list">${saved
+          .map((item) => {
+            const choice = item.choices.find(
+              (candidate) => candidate.id === item.selection.optionId,
+            );
+            return `<p><span>${escape(item.categoryLabel)}</span><b>${escape(choice?.label || "記録あり")}</b><small>${escape(item.question)}</small></p>`;
+          })
+          .join("")}</div>`
+      : '<p class="muted">記録はまだありません。</p>'
+  }</div>${button("現実予測へ　→", "prediction", "secondary")}</section>`;
 }
 async function mutate(path, body) {
   if (!online) throw new Error("保存サーバーへの再接続が必要です。");
   const data = await api(path, body);
   if (data.player) player = data.player;
+  if (data.predictions) setPredictionData(data.predictions);
   render();
   return data;
 }
@@ -363,6 +452,23 @@ function welcome() {
   local.set("welcomed", true);
 }
 async function action(name) {
+  const predictionVote = name.match(
+    /^prediction-vote-(PRED-\d{8}-\d{3})-v(\d+)-([A-D])$/,
+  );
+  if (predictionVote) {
+    const item = predictionData?.items.find(
+      (candidate) =>
+        candidate.id === predictionVote[1] &&
+        candidate.version === Number(predictionVote[2]),
+    );
+    if (!item) throw new Error("予測問題を確認できませんでした。");
+    await mutate(`/api/predictions/${item.id}/vote`, {
+      version: item.version,
+      optionId: predictionVote[3],
+    });
+    toast("予測を記録しました。");
+    return;
+  }
   if (name === "name-save") {
     await mutate("/api/profile/name", {
       name: document.querySelector("#subject-name").value,
@@ -549,13 +655,29 @@ async function action(name) {
   }
   if (name === "export") {
     if (!player) throw new Error("保存する記録がありません。");
+    const predictionRecords = (predictionData?.items || [])
+      .filter((item) => item.selection)
+      .map((item) => ({
+        predictionId: item.id,
+        version: item.version,
+        question: item.question,
+        choice: item.choices.find(
+          (choice) => choice.id === item.selection.optionId,
+        )?.label,
+        selectedAt: item.selection.selectedAt,
+        updatedAt: item.selection.updatedAt,
+        state: item.state,
+        result: item.result?.label || null,
+        correct: item.correct,
+      }));
     const blob = new Blob(
       [
         JSON.stringify(
           {
-            schemaVersion: 1,
+            schemaVersion: 2,
             exportedAt: new Date(serverNow()).toISOString(),
             player,
+            predictionRecords,
           },
           null,
           2,
@@ -626,8 +748,42 @@ async function connect() {
     online = true;
   } catch {
     online = false;
+    setPredictionData(null);
+    render();
+    return;
+  }
+  try {
+    const feed = await api("/api/predictions");
+    setPredictionData(feed.predictions);
+  } catch {
+    setPredictionData(null);
   }
   render();
+}
+function setPredictionData(data) {
+  predictionData = data;
+  clearTimeout(predictionRefreshTimer);
+  predictionRefreshTimer = null;
+  if (!data?.nextChangeAt) return;
+  const delay = Math.max(
+    1000,
+    Math.min(2147483000, Date.parse(data.nextChangeAt) - serverNow() + 500),
+  );
+  predictionRefreshTimer = setTimeout(refreshPredictionBoundary, delay);
+}
+async function refreshPredictionBoundary() {
+  if (!online) return;
+  if (busy) {
+    predictionRefreshTimer = setTimeout(refreshPredictionBoundary, 1000);
+    return;
+  }
+  try {
+    const feed = await api("/api/predictions");
+    setPredictionData(feed.predictions);
+    if (route === "prediction" || route === "archive") render();
+  } catch {
+    predictionRefreshTimer = setTimeout(refreshPredictionBoundary, 30000);
+  }
 }
 applySettings();
 route = location.hash.slice(1) || "home";
