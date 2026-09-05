@@ -121,6 +121,12 @@ test("phone navigation and primary copy keep readable line breaks", async ({
   await enter(page);
 
   await expectSixNavigationItemsToFit(page);
+  await expect(
+    page.locator('.footer a[href="https://yu-zora.com/"]'),
+  ).toHaveText("YU-ZORAトップ");
+  await expect(
+    page.locator('.footer a[href="https://yu-zora.com/privacy/"]'),
+  ).toHaveText("プライバシーポリシー");
 
   const heroLines = await renderedLines(page.locator(".hero h2"));
   expect(heroLines).toHaveLength(2);
