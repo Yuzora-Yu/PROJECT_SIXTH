@@ -25,13 +25,35 @@ PACKAGE_ROOTS = (
 )
 
 
+def frontmatter(text: str) -> str:
+    match = re.match(r"\A---\n(.*?)\n---\n", text, re.S)
+    if not match:
+        raise AssertionError("SKILL.md is missing YAML frontmatter")
+    return match.group(1)
+
+
+def top_level_field(block: str, key: str) -> list[str]:
+    return re.findall(rf"(?m)^{re.escape(key)}:\s*(.*?)\s*$", block)
+
+
+def version_tuple(value: str) -> tuple[int, int, int]:
+    return tuple(int(part) for part in value.split("."))  # type: ignore[return-value]
+
+
 class SparkSkillSyncTests(unittest.TestCase):
     def test_skill_sources_and_all_upload_packages_match_canonical(self):
+        versions: list[str] = []
         for name in SKILL_NAMES:
             with self.subTest(skill=name):
                 canonical = (CANONICAL_SKILLS / name / "SKILL.md").read_bytes()
                 text = canonical.decode("utf-8")
-                self.assertRegex(text, r"(?m)^version: 2\.3\.0$")
+                metadata = frontmatter(text)
+                self.assertEqual(top_level_field(metadata, "name"), [name])
+                version_fields = top_level_field(metadata, "version")
+                self.assertEqual(len(version_fields), 1)
+                version = version_fields[0]
+                self.assertRegex(version, r"^[0-9]+\.[0-9]+\.[0-9]+$")
+                versions.append(version)
                 self.assertIn("Append each audit row **once only**", text)
                 self.assertNotIn("append once more to a fresh row", text)
                 self.assertEqual(
@@ -42,22 +64,46 @@ class SparkSkillSyncTests(unittest.TestCase):
                         self.assertEqual(archive.namelist(), ["SKILL.md"])
                         self.assertEqual(archive.read("SKILL.md"), canonical)
 
+        expected_package_version = max(versions, key=version_tuple)
+        canonical_contract = json.loads(
+            (ROOT / "gemini-spark" / "ops_contract.json").read_text(encoding="utf-8")
+        )
+        self.assertEqual(
+            canonical_contract["skill_package_version"], expected_package_version
+        )
+
     def test_task_sources_are_mirrored(self):
-        for canonical in sorted((ROOT / "gemini-spark" / "tasks").glob("T*.md")):
+        canonical_root = ROOT / "gemini-spark" / "tasks"
+        mirror_root = ROOT / "spark" / "tasks"
+        for canonical in sorted(canonical_root.glob("T*.md")):
             if canonical.name == "TASKS.md":
                 continue
-            mirror = ROOT / "spark" / "tasks" / canonical.name
+            mirror = mirror_root / canonical.name
             with self.subTest(task=canonical.name):
                 self.assertTrue(mirror.exists())
-                self.assertEqual(mirror.read_bytes(), canonical.read_bytes())
+                self.assertEqual(
+                    mirror.read_bytes(),
+                    canonical.read_bytes(),
+                    "Run `npm run spark:sync` to repair task mirror drift.",
+                )
+
+        self.assertEqual(
+            (ROOT / "spark" / "TASKS.md").read_bytes(),
+            (canonical_root / "TASKS.md").read_bytes(),
+            "Run `npm run spark:sync` to repair spark/TASKS.md drift.",
+        )
 
     def test_ops_contract_mirrors_match_current_versions(self):
-        canonical = json.loads((ROOT / "gemini-spark" / "ops_contract.json").read_text(encoding="utf-8"))
-        mirror = json.loads((ROOT / "spark" / "ops_contract.json").read_text(encoding="utf-8"))
+        canonical = json.loads(
+            (ROOT / "gemini-spark" / "ops_contract.json").read_text(encoding="utf-8")
+        )
+        mirror = json.loads(
+            (ROOT / "spark" / "ops_contract.json").read_text(encoding="utf-8")
+        )
         self.assertEqual(canonical, mirror)
         self.assertEqual(canonical["release_version"], "2.2.0")
-        self.assertEqual(canonical["skill_package_version"], "2.3.0")
         self.assertEqual(canonical["task_package_version"], "2.2.0")
+        self.assertEqual(canonical["gas_implementation_compatible"], "2.1.2")
 
 
 if __name__ == "__main__":

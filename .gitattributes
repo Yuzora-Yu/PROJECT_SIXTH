@@ -1,0 +1,12 @@
+# PROJECT SIXTH canonical text normalization
+# Avoid Windows CRLF/LF drift in byte-for-byte Spark mirror checks.
+gemini-spark/tasks/*.md text eol=lf
+spark/tasks/*.md text eol=lf
+gemini-spark/skills/*/SKILL.md text eol=lf
+spark/skills/*/SKILL.md text eol=lf
+scripts/sync-spark-skills.py text eol=lf
+tests/test_spark_skill_sync.py text eol=lf
+
+# Generated/binary artifacts must never be line-ending normalized.
+*.zip binary
+*.xlsx binary

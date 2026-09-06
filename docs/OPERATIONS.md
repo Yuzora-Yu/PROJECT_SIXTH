@@ -7,9 +7,9 @@ Spreadsheet / Gemini Spark Skills / Tasks / GAS は同じcontractで運用する
 - contract_id: `PROJECT_SIXTH_PREDICTION_OPS`
 - schema_version: `2.0.0`
 - release_version: `2.2.0`
-- skill_package_version: `2.3.0`
+- skill_package_version: `2.3.1`
 - task_package_version: `2.2.0`
-- compatible GAS: `2.0.3`
+- compatible GAS: `2.1.2`
 - target spreadsheet id: `1ZGb__FQT25BPkzovq2UTfO4clvE7G71PiRm3yywSj6Y`
 - target base URL: `https://docs.google.com/spreadsheets/d/1ZGb__FQT25BPkzovq2UTfO4clvE7G71PiRm3yywSj6Y/edit`
 - timezone: `Asia/Tokyo`
@@ -52,7 +52,7 @@ T01 収集 → T02 ドラフト → T03 独立監査 → T04 掲載判定 → Gi
 
 ## GAS overwrite
 
-固定target fileは削除しない。sourceはread only、targetは事前backup、timezoneは`Asia/Tokyo`。contract/tab/gid policyをpreflightし、stage/verify後にcommitする。compatible implementationは2.0.3。
+固定target fileは削除しない。sourceはread only、targetは事前backup、timezoneは`Asia/Tokyo`。contract/tab/gid policyをpreflightし、stage/verify後にcommitする。compatible implementationは2.1.2。
 
 ## Versioning rule
 

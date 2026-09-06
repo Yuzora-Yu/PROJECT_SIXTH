@@ -1,9 +1,9 @@
 ---
 name: audit-prediction-question
-description: |
-  description: 公開前ドラフトを独立監査し、事実、日時、選択肢、情報源、重複、判定可能性と新規source候補を検証する。
-  version: 2.3.1
+description: 公開前ドラフトを独立監査し、事実、日時、選択肢、情報源、重複、判定可能性と新規source候補を検証する。
+version: 2.3.1
 ---
+
 # audit-prediction-question
 
 ## Fixed contract

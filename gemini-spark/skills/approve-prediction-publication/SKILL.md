@@ -1,9 +1,9 @@
 ---
 name: approve-prediction-publication
-description: |
-  CHECK_PASSED問題を最終監査し、公開日、締切日、結果確認予定日時を決め、Git Action 1の公開ゲートを承認する。
-  version: 2.3.1
+description: CHECK_PASSED問題を最終監査し、公開日、締切日、結果確認予定日時を決め、Git Action 1の公開ゲートを承認する。
+version: 2.3.1
 ---
+
 # approve-prediction-publication
 
 ## Fixed contract
