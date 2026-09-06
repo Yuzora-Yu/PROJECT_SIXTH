@@ -205,7 +205,7 @@ bridgeは固定Spreadsheet ID、固定4レンジ、XLSX export、Action 1の定�
 - 本番ユーザーのアクセスを Spark / LLM の可用性に依存させない。
 - 報酬・経済値を Gemini に創作させない。
 
-## 固定Spreadsheet（public release 2.2.0 / Skill package 2.3.2）
+## 固定Spreadsheet（public release 2.2.0 / Skill package 2.3.3 / Task package 2.2.1）
 
 Gemini Spark の予測運用は次の個人所有Google Sheetだけを正本として扱う。
 
@@ -220,4 +220,4 @@ Gemini Spark の予測運用は次の個人所有Google Sheetだけを正本と�
 
 全Skill/Taskはこのbase URLを内包する。Drive上の似た名前のSheetを検索・代替してはならない。アクセス不能、`05_CONFIG` のcontract/schema不一致、必要タブ欠落時はfail closedとし、別Sheetを作成・編集しない。`gid` は参照・契約に使用せず、処理対象タブはexact tab nameで指定する。
 
-Task本文は `gemini-spark/tasks/` の個別Markdownを登録用正本とする。Skill本文は `gemini-spark/skills/`、登録ZIPは `gemini-spark/packages/` を正本とする。Skill package 2.3.2では、2.3.1のprimary source hard gateを維持したまま、T03へ `prediction_id|version` のexact-row再解決、1 entity=1 exact-row write、replay fence、single-entity audit appendを追加する。T04は2.3.1の独立source gateを継続する。`gemini-spark/` をcanonicalとし、mirror/package driftはCIと `npm run spark:sync:check` で検証する。
+Task本文は `gemini-spark/tasks/` の個別Markdownを登録用正本とする。Skill本文は `gemini-spark/skills/`、登録ZIPは `gemini-spark/packages/` を正本とする。Skill package 2.3.3では、T03を2.3.3へ更新し、prediction_id+version exact-row書込、entity-local error state、physical-tail+1の明示log write、terminal RUN_LOGを必須化する。T04は2.3.1のprimary source hard gateを維持する。Task package 2.2.1ではT03に `Required Skill Runtime=T03@2.3.3` を固定し、旧runtime選択時は書込前にFAIL CLOSEDする。`gemini-spark/` をcanonicalとし、mirror/package driftはCIと `npm run spark:sync:check` で検証する。

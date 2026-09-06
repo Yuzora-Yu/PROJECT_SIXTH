@@ -2,8 +2,8 @@
   "release_version": "2.2.0",
   "contract_id": "PROJECT_SIXTH_PREDICTION_OPS",
   "schema_version": "2.0.0",
-  "skill_package_version": "2.3.2",
-  "task_package_version": "2.2.0",
+  "skill_package_version": "2.3.3",
+  "task_package_version": "2.2.1",
   "target_spreadsheet_id": "1ZGb__FQT25BPkzovq2UTfO4clvE7G71PiRm3yywSj6Y",
   "target_base_url": "https://docs.google.com/spreadsheets/d/1ZGb__FQT25BPkzovq2UTfO4clvE7G71PiRm3yywSj6Y/edit",
   "timezone": "Asia/Tokyo",
@@ -37,5 +37,11 @@
   },
   "same_slot_policy": "NO_ORDER_DEPENDENCY",
   "result_row_key": "prediction_id|version",
-  "source_growth_policy": "T1_T2_DISCOVER__T3_VERIFY__T4_APPROVE"
+  "source_growth_policy": "T1_T2_DISCOVER__T3_VERIFY__T4_APPROVE",
+  "t3_required_skill_version": "2.3.3",
+  "t3_log_write_mode": "EXPLICIT_PHYSICAL_TAIL_PLUS_ONE",
+  "t3_log_hole_policy": "IGNORE_INTERIOR_BLANK_ROWS",
+  "t3_terminal_run_log_required": true,
+  "t3_source_gate_error_code": "E022",
+  "t3_entity_error_state_policy": "RESET_PER_ENTITY"
 }

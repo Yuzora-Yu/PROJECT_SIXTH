@@ -54,7 +54,7 @@ class SparkSkillSyncTests(unittest.TestCase):
                 version = version_fields[0]
                 self.assertRegex(version, r"^[0-9]+\.[0-9]+\.[0-9]+$")
                 versions.append(version)
-                self.assertIn("Append each audit row **once only", text)
+                self.assertIn("Append each audit row **once only**", text)
                 self.assertNotIn("append once more to a fresh row", text)
                 self.assertEqual(
                     (MIRROR_SKILLS / name / "SKILL.md").read_bytes(), canonical
@@ -71,23 +71,6 @@ class SparkSkillSyncTests(unittest.TestCase):
         self.assertEqual(
             canonical_contract["skill_package_version"], expected_package_version
         )
-
-    def test_t03_row_targeting_and_replay_guards_are_present(self):
-        text = (
-            CANONICAL_SKILLS / "audit-prediction-question" / "SKILL.md"
-        ).read_text(encoding="utf-8")
-        metadata = frontmatter(text)
-        self.assertEqual(top_level_field(metadata, "version"), ["2.3.2"])
-        for required in (
-            "One prediction = one exact-row write",
-            "t3_run_id` is also a durable replay fence",
-            "one row at a time",
-            "prediction_id` is the only authoritative row locator",
-            "action=QUESTION_AUDITED",
-        ):
-            with self.subTest(required=required):
-                self.assertIn(required, text)
-        self.assertIn("blank `prediction_id`", text)
 
     def test_task_sources_are_mirrored(self):
         canonical_root = ROOT / "gemini-spark" / "tasks"
@@ -119,8 +102,36 @@ class SparkSkillSyncTests(unittest.TestCase):
         )
         self.assertEqual(canonical, mirror)
         self.assertEqual(canonical["release_version"], "2.2.0")
-        self.assertEqual(canonical["task_package_version"], "2.2.0")
+        self.assertEqual(canonical["task_package_version"], "2.2.1")
         self.assertEqual(canonical["gas_implementation_compatible"], "2.1.2")
+
+    def test_t03_v233_runtime_and_log_hardening(self):
+        skill = (CANONICAL_SKILLS / "audit-prediction-question" / "SKILL.md").read_text(encoding="utf-8")
+        task = (ROOT / "gemini-spark" / "tasks" / "T03_audit_prediction_question.md").read_text(encoding="utf-8")
+        contract = json.loads((ROOT / "gemini-spark" / "ops_contract.json").read_text(encoding="utf-8"))
+
+        self.assertEqual(top_level_field(frontmatter(skill), "version"), ["2.3.3"])
+        for required in (
+            "Required Skill Runtime=T03@2.3.3",
+            "greatest physical row number",
+            "Never use an implicit append operation",
+            "target_row = tail_row + 1",
+            "terminal `12_RUN_LOG` row is mandatory",
+            "last_error_code=E022",
+            "Never carry these values from the prior entity",
+        ):
+            self.assertIn(required, skill)
+
+        self.assertIn("Required Skill Runtime=T03@2.3.3", task)
+        self.assertIn("t3_required_skill_version=2.3.3", task)
+        self.assertEqual(contract["skill_package_version"], "2.3.3")
+        self.assertEqual(contract["task_package_version"], "2.2.1")
+        self.assertEqual(contract["t3_required_skill_version"], "2.3.3")
+        self.assertEqual(contract["t3_log_write_mode"], "EXPLICIT_PHYSICAL_TAIL_PLUS_ONE")
+        self.assertEqual(contract["t3_log_hole_policy"], "IGNORE_INTERIOR_BLANK_ROWS")
+        self.assertTrue(contract["t3_terminal_run_log_required"])
+        self.assertEqual(contract["t3_source_gate_error_code"], "E022")
+        self.assertEqual(contract["t3_entity_error_state_policy"], "RESET_PER_ENTITY")
 
 
 if __name__ == "__main__":
