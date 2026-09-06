@@ -96,31 +96,27 @@
   </div>
 
   <div class="warn">
-    v2.0.3では、まずコピー元15タブを別名で全部stage・検証し、
-    その後にだけ既存コピー先を退避します。
-    過去の失敗でコピー先に余計なタブが残っていても修復できます。 Google Sheets側の一時的なcopyToエラーは各タブ最大6回まで自動再試行します。 数式は文字列完全一致ではなく、数式数・参照先・#REF!/一時tab参照の有無で検証します。
+    v2.1.0では安全性を維持したまま、数式復元・flush・重複検証をバッチ化しています。
+    DriveのGoogle Sheetsを最大10件だけ自動読込します。URL / IDの直接入力も利用できます。
     バックアップは必須です。
   </div>
 
   <div class="card">
+    <label><strong>コピー元URLまたはSpreadsheet ID</strong></label>
+    <input id="manual" type="text"
+      placeholder="https://docs.google.com/spreadsheets/d/... または Spreadsheet ID">
+
     <div class="two">
       <div>
-        <label><strong>コピー元を一覧から選択</strong></label>
+        <label><strong>Google Sheets一覧（最大10件）</strong></label>
         <input id="filter" type="text"
           placeholder="ファイル名で絞り込み"
           oninput="filterFiles()">
       </div>
-      <button class="secondary" onclick="loadFiles()">一覧を再読込</button>
+      <button class="secondary" onclick="loadFiles()">一覧を読込</button>
     </div>
 
-    <select id="files" size="14"></select>
-
-    <div class="muted">
-      一覧にない場合のみURLまたはSpreadsheet IDを直接入力できます。
-    </div>
-
-    <input id="manual" type="text"
-      placeholder="https://docs.google.com/spreadsheets/d/... または Spreadsheet ID">
+    <select id="files" size="10"></select>
 
     <button id="previewButton" class="primary" onclick="previewSource()">
       コピー内容を確認
@@ -213,7 +209,7 @@ function previewSource() {
   var input = getSourceInput();
 
   if (!input) {
-    setStatus('コピー元を選択するか、URL / IDを入力してください。');
+    setStatus('コピー元URL / IDを入力するか、一覧から選択してください。');
     return;
   }
 
@@ -235,7 +231,7 @@ function previewSource() {
         '現在のtarget tabs: ' + info.targetCurrentSheets.length + '\n' +
         '現在のtarget timezone: ' + info.targetCurrentTimeZone + '\n' +
         '完了後timezone: ' + info.targetFinalTimeZone + '\n\n' +
-        'sourceは正常です。targetが途中失敗状態でも15タブへ修復します。';
+        'sourceは正常です。';
 
       document.getElementById('preview').style.display = 'block';
       setBusy(false);
@@ -264,13 +260,17 @@ function runOverwrite() {
   setBusy(true);
   setStatus(
     '処理中です。\n' +
-    'backup → stage 15 tabs → stage verify → old退避 → promote → ' +
-    'formula/validation復元 → final verify → old削除 の順です。'
+    'backup → stage 15 tabs → verify → promote → formulas → final verify → old削除'
   );
 
   google.script.run
     .withSuccessHandler(function(result) {
       setBusy(false);
+
+      var seconds =
+        typeof result.durationMs === 'number'
+          ? (result.durationMs / 1000).toFixed(1)
+          : '?';
 
       var text =
         '完了しました。\n' +
@@ -279,6 +279,7 @@ function runOverwrite() {
         'コピー元: ' + result.sourceName + '\n' +
         'コピー先timezone: ' + result.targetTimeZone + '\n' +
         '最終tab数: ' + result.sheetCount + '\n' +
+        '処理時間: ' + seconds + '秒\n' +
         '完了時刻(JST): ' + result.completedAtJst + '\n' +
         'バックアップ: ' + result.backupUrl;
 

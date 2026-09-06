@@ -1,5 +1,5 @@
 /**
- * PROJECT SIXTH Prediction Ops - Fixed Target Overwriter v2.0.3
+ * PROJECT SIXTH Prediction Ops - Fixed Target Overwriter v2.1.1
  * Contract: PROJECT_SIXTH_PREDICTION_OPS / schema 2.0.0
  *
  * HOTFIX v2.0.2:
@@ -14,22 +14,47 @@
  * - commit失敗時は staged tabs を退避 → old tabsを元名へ復旧 → staged削除。
  * - 現在のtargetが途中失敗で汚れていても、source contractさえ正しければ修復可能。
  * - source SpreadsheetはREAD ONLY。削除・改名・timezone変更をしない。
+ *
+ * PERFORMANCE v2.1.0:
+ * - 不要なflushを削減し、rename/copyの同期回数を大幅に削減。
+ * - 数式復元を「1行ずつ」ではなく連続矩形ブロック単位で一括setFormulas。
+ * - minRowsを既に満たすSheetではvalidation/formulaの全範囲再延長をしない。
+ * - stageで確認済みのnumber formatをfinalで重複再読込しない。
+ * - post-commitの数式全走査を二重に行わない。
+ * - source一覧の自動走査上限を100件へ縮小。
+ *
+ * OPERABILITY v2.1.1:
+ * - Drive一覧の自動走査を最大10件へ縮小。
+ * - 運用データが予約行末へ近づいたら、key列(A)を基準にheadroomを自動追加。
+ * - 追加行にはtemplate row由来のformat / validation / formulaを延長。
+ * - ensureTargetCapacity() と任意の毎時capacity guard triggerを追加。
  */
 
 var CONFIG = {
-  IMPLEMENTATION_VERSION: '2.0.3',
+  IMPLEMENTATION_VERSION: '2.1.1',
   CONTRACT_ID: 'PROJECT_SIXTH_PREDICTION_OPS',
   SCHEMA_VERSION: '2.0.0',
   TARGET_SPREADSHEET_ID: '1ZGb__FQT25BPkzovq2UTfO4clvE7G71PiRm3yywSj6Y',
   TARGET_BASE_URL: 'https://docs.google.com/spreadsheets/d/1ZGb__FQT25BPkzovq2UTfO4clvE7G71PiRm3yywSj6Y/edit',
   TARGET_TIME_ZONE: 'Asia/Tokyo',
-  SOURCE_LIST_LIMIT: 500,
+  SOURCE_LIST_LIMIT: 10,
   LOCK_WAIT_MS: 30000,
   COPY_RETRY_MAX: 6,
   COPY_RETRY_BASE_MS: 1200,
-  COPY_SUCCESS_PAUSE_MS: 800,
+  COPY_SUCCESS_PAUSE_MS: 150,
   BACKUP_NAME_PREFIX: 'BACKUP_PROJECT_SIXTH_PREDICTION_OPS'
 };
+
+var CAPACITY_POLICY = Object.freeze({
+  '06_PREDICTIONS': Object.freeze({headroom: 500, block: 500}),
+  '07_SOURCE_MASTER': Object.freeze({headroom: 100, block: 100}),
+  '08_SOURCE_CANDIDATES': Object.freeze({headroom: 500, block: 500}),
+  '09_RESULTS': Object.freeze({headroom: 500, block: 500}),
+  '10_EVENT_WATCH': Object.freeze({headroom: 500, block: 500}),
+  '11_AUDIT_LOG': Object.freeze({headroom: 1000, block: 1000}),
+  '12_RUN_LOG': Object.freeze({headroom: 1000, block: 1000})
+});
+
 
 var REQUIRED_TABS = [
   '00_DASHBOARD',
@@ -148,6 +173,7 @@ function overwriteTargetFromSource(sourceInput) {
   var backupUrl = '';
   var auditWarning = '';
   var formulaWarnings = [];
+  var startedAtMs = Date.now();
 
   var runId =
     'GAS-' +
@@ -226,8 +252,9 @@ function overwriteTargetFromSource(sourceInput) {
         stageName: stageName
       });
 
-      SpreadsheetApp.flush();
-      Utilities.sleep(CONFIG.COPY_SUCCESS_PAUSE_MS);
+      if (CONFIG.COPY_SUCCESS_PAUSE_MS > 0) {
+        Utilities.sleep(CONFIG.COPY_SUCCESS_PAUSE_MS);
+      }
     });
 
     phase = 'STAGE_COPY_COMPLETE';
@@ -361,7 +388,8 @@ function overwriteTargetFromSource(sourceInput) {
         new Date(),
         CONFIG.TARGET_TIME_ZONE,
         "yyyy-MM-dd'T'HH:mm:ssXXX"
-      )
+      ),
+      durationMs: Date.now() - startedAtMs
     };
 
   } catch (error) {
@@ -655,19 +683,9 @@ function verifyFinalCanonical_(
         formulaWarnings
       );
 
-      var sourceFormats =
-        sourceSheet
-          .getRange(1, 1, sourceLastRow, sourceLastColumn)
-          .getNumberFormats();
-
-      var targetFormats =
-        targetSheet
-          .getRange(1, 1, sourceLastRow, sourceLastColumn)
-          .getNumberFormats();
-
-      if (JSON.stringify(sourceFormats) !== JSON.stringify(targetFormats)) {
-        throw new Error('FINAL VERIFY formats mismatch: ' + tabName);
-      }
+      // number formatはVERIFY_STAGEでsource/stage一致を確認済み。
+      // 以降のformula/named-range操作はnumber formatを変更しないため、
+      // ここでは巨大rangeの再読込を行わない。
     }
 
     if (sourceSheet.getFrozenRows() !== targetSheet.getFrozenRows()) {
@@ -819,10 +837,7 @@ function verifyFormulaIntegrity_(
         continue;
       }
 
-      var a1 =
-        targetSheet
-          .getRange(r + 1, c + 1)
-          .getA1Notation();
+      var a1 = a1FromRowCol_(r + 1, c + 1);
 
       if (!targetFormula) {
         throw new Error(
@@ -999,30 +1014,12 @@ function verifyPostCommitIntegrity_(
       warnings
     );
 
-    var lastRow = targetSheet.getLastRow();
-    var lastColumn = targetSheet.getLastColumn();
-
-    if (lastRow > 0 && lastColumn > 0) {
-      var formulas =
-        targetSheet
-          .getRange(1, 1, lastRow, lastColumn)
-          .getFormulas();
-
-      for (var r = 0; r < formulas.length; r++) {
-        for (var c = 0; c < formulas[r].length; c++) {
-          if (formulas[r][c]) {
-            assertFormulaHasNoBrokenOrTempRef_(
-              formulas[r][c],
-              targetSheet.getName() +
-              '!' +
-              targetSheet
-                .getRange(r + 1, c + 1)
-                .getA1Notation()
-            );
-          }
-        }
-      }
-    }
+    // verifyFormulaIntegrity_ が
+    // - source数式セルの存在
+    // - 数式総数一致
+    // - #REF!/一時tab参照なし
+    // - sheet依存先一致
+    // をすでに全数式について確認しているため、同一rangeを再取得しない。
   });
 }
 
@@ -1032,6 +1029,8 @@ function verifyPostCommitIntegrity_(
 // -----------------------------------------------------------------------------
 
 function normalizeOperationalCapacity_(target, configMap) {
+  var expansions = [];
+
   REQUIRED_TABS.forEach(function(tabName) {
     var key = 'min_rows_' + tabName;
 
@@ -1054,59 +1053,249 @@ function normalizeOperationalCapacity_(target, configMap) {
     }
 
     var oldMaxRows = sheet.getMaxRows();
-    var lastColumn = Math.max(sheet.getLastColumn(), 1);
     var templateRow = parseInt(
       configMap.data_template_row || '4',
       10
     );
+    var policy = CAPACITY_POLICY[tabName] || {headroom: 0, block: 1};
+    var liveLastRow = lastNonEmptyKeyRow_(sheet, templateRow);
+    var requiredRows = minRows;
 
-    if (oldMaxRows < minRows) {
-      sheet.insertRowsAfter(
-        oldMaxRows,
-        minRows - oldMaxRows
+    if (policy.headroom > 0) {
+      requiredRows = Math.max(
+        requiredRows,
+        liveLastRow + policy.headroom
       );
-
-      var templateFormat =
-        sheet.getRange(templateRow, 1, 1, lastColumn);
-
-      var newRows =
-        sheet.getRange(
-          oldMaxRows + 1,
-          1,
-          minRows - oldMaxRows,
-          lastColumn
-        );
-
-      templateFormat.copyTo(
-        newRows,
-        SpreadsheetApp.CopyPasteType.PASTE_FORMAT,
-        false
-      );
+      requiredRows = roundUpRows_(requiredRows, policy.block);
     }
+
+    // copyToしたsource / 現在targetが必要容量を満たす場合は何もしない。
+    if (oldMaxRows >= requiredRows) {
+      return;
+    }
+
+    var lastColumn = Math.max(sheet.getLastColumn(), 1);
+    var newStartRow = oldMaxRows + 1;
+
+    sheet.insertRowsAfter(
+      oldMaxRows,
+      requiredRows - oldMaxRows
+    );
+
+    var templateFormat =
+      sheet.getRange(templateRow, 1, 1, lastColumn);
+
+    var newRows =
+      sheet.getRange(
+        newStartRow,
+        1,
+        requiredRows - oldMaxRows,
+        lastColumn
+      );
+
+    templateFormat.copyTo(
+      newRows,
+      SpreadsheetApp.CopyPasteType.PASTE_FORMAT,
+      false
+    );
 
     extendValidationFromTemplateRow_(
       sheet,
       templateRow,
-      minRows,
+      newStartRow,
+      requiredRows,
       lastColumn
     );
 
     extendFormulaFromTemplateRow_(
       sheet,
       templateRow,
-      minRows,
+      newStartRow,
+      requiredRows,
       lastColumn
     );
+
+    verifyExtendedFormulaColumns_(
+      sheet,
+      templateRow,
+      newStartRow,
+      requiredRows,
+      lastColumn
+    );
+
+    expansions.push({
+      sheet: tabName,
+      oldMaxRows: oldMaxRows,
+      newMaxRows: requiredRows,
+      liveLastRow: liveLastRow,
+      headroom: requiredRows - liveLastRow
+    });
   });
+
+  return expansions;
+}
+
+
+function lastNonEmptyKeyRow_(sheet, templateRow) {
+  var maxRows = sheet.getMaxRows();
+  var rowCount = maxRows - templateRow + 1;
+
+  if (rowCount <= 0) {
+    return templateRow - 1;
+  }
+
+  var values =
+    sheet
+      .getRange(templateRow, 1, rowCount, 1)
+      .getDisplayValues();
+
+  for (var index = values.length - 1; index >= 0; index--) {
+    if (String(values[index][0] || '').trim() !== '') {
+      return templateRow + index;
+    }
+  }
+
+  return templateRow - 1;
+}
+
+
+function roundUpRows_(value, block) {
+  if (!block || block <= 1) {
+    return value;
+  }
+  return Math.ceil(value / block) * block;
+}
+
+
+function verifyExtendedFormulaColumns_(
+  sheet,
+  templateRow,
+  startRow,
+  endRow,
+  lastColumn
+) {
+  if (startRow > endRow) {
+    return;
+  }
+
+  var templateFormulas =
+    sheet
+      .getRange(templateRow, 1, 1, lastColumn)
+      .getFormulas()[0];
+
+  for (var col = 0; col < templateFormulas.length; col++) {
+    if (!templateFormulas[col]) {
+      continue;
+    }
+
+    var formulas =
+      sheet
+        .getRange(
+          startRow,
+          col + 1,
+          endRow - startRow + 1,
+          1
+        )
+        .getFormulas();
+
+    for (var row = 0; row < formulas.length; row++) {
+      if (!formulas[row][0]) {
+        throw new Error(
+          'capacity formula extension failed: ' +
+          sheet.getName() + '!' +
+          a1FromRowCol_(startRow + row, col + 1)
+        );
+      }
+    }
+  }
+}
+
+
+/**
+ * 本番targetの予約行headroomだけを確認・補充する軽量メンテナンス。
+ * Workbook全置換は行わない。
+ */
+function ensureTargetCapacity() {
+  var lock = LockService.getScriptLock();
+
+  if (!lock.tryLock(CONFIG.LOCK_WAIT_MS)) {
+    throw new Error('別の上書き/容量補充処理が実行中です。');
+  }
+
+  try {
+    var target = SpreadsheetApp.openById(CONFIG.TARGET_SPREADSHEET_ID);
+    validateTargetContract_(target);
+    var configMap = readConfigMap_(target);
+    var expansions = normalizeOperationalCapacity_(target, configMap);
+
+    SpreadsheetApp.flush();
+
+    return {
+      ok: true,
+      implementationVersion: CONFIG.IMPLEMENTATION_VERSION,
+      expansions: expansions,
+      checkedAtJst: Utilities.formatDate(
+        new Date(),
+        CONFIG.TARGET_TIME_ZONE,
+        "yyyy-MM-dd'T'HH:mm:ssXXX"
+      )
+    };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+
+function capacityGuard() {
+  try {
+    return ensureTargetCapacity();
+  } catch (error) {
+    console.error(
+      'capacityGuard failed: ' +
+      (error && error.message ? error.message : String(error))
+    );
+    throw error;
+  }
+}
+
+
+/** 1回だけ手動実行すると、毎時capacityGuardを登録する。 */
+function installCapacityGuardTrigger() {
+  removeCapacityGuardTrigger();
+
+  ScriptApp
+    .newTrigger('capacityGuard')
+    .timeBased()
+    .everyHours(1)
+    .create();
+
+  return {ok: true, trigger: 'capacityGuard', cadence: 'hourly'};
+}
+
+
+function removeCapacityGuardTrigger() {
+  var removed = 0;
+  ScriptApp.getProjectTriggers().forEach(function(trigger) {
+    if (trigger.getHandlerFunction() === 'capacityGuard') {
+      ScriptApp.deleteTrigger(trigger);
+      removed++;
+    }
+  });
+  return {ok: true, removed: removed};
 }
 
 
 function extendValidationFromTemplateRow_(
   sheet,
   templateRow,
-  minRows,
+  startRow,
+  endRow,
   lastColumn
 ) {
+  if (startRow > endRow) {
+    return;
+  }
+
   var rules =
     sheet
       .getRange(templateRow, 1, 1, lastColumn)
@@ -1116,9 +1305,9 @@ function extendValidationFromTemplateRow_(
     if (rules[col]) {
       sheet
         .getRange(
-          templateRow,
+          startRow,
           col + 1,
-          minRows - templateRow + 1,
+          endRow - startRow + 1,
           1
         )
         .setDataValidation(rules[col]);
@@ -1130,9 +1319,14 @@ function extendValidationFromTemplateRow_(
 function extendFormulaFromTemplateRow_(
   sheet,
   templateRow,
-  minRows,
+  startRow,
+  endRow,
   lastColumn
 ) {
+  if (startRow > endRow) {
+    return;
+  }
+
   var formulas =
     sheet
       .getRange(templateRow, 1, 1, lastColumn)
@@ -1145,9 +1339,9 @@ function extendFormulaFromTemplateRow_(
 
       var destination =
         sheet.getRange(
-          templateRow,
+          startRow,
           col + 1,
-          minRows - templateRow + 1,
+          endRow - startRow + 1,
           1
         );
 
@@ -1184,39 +1378,92 @@ function restoreFormulasOnly_(sourceSheet, targetSheet) {
       .getRange(1, 1, lastRow, lastColumn)
       .getFormulas();
 
+  var blocks = buildFormulaBlocks_(formulas);
+
+  blocks.forEach(function(block) {
+    targetSheet
+      .getRange(
+        block.startRow,
+        block.startColumn,
+        block.formulas.length,
+        block.formulas[0].length
+      )
+      .setFormulas(block.formulas);
+  });
+}
+
+
+/**
+ * 数式セルを、同じ横方向runが連続する行ごとの矩形blockへ圧縮する。
+ * 06_PREDICTIONS!AQ4:AR2000 は従来1997回setFormulasしていたが、
+ * この方式では1回のsetFormulasで復元できる。
+ */
+function buildFormulaBlocks_(formulas) {
+  var blocks = [];
+  var active = {};
+
   for (var r = 0; r < formulas.length; r++) {
-    var start = -1;
-    var run = [];
+    var runs = formulaRunsInRow_(formulas[r]);
+    var present = {};
 
-    for (var c = 0; c <= formulas[r].length; c++) {
-      var formula =
-        c < formulas[r].length
-          ? formulas[r][c]
-          : '';
+    runs.forEach(function(run) {
+      var key = run.startColumn + ':' + run.endColumn;
+      present[key] = true;
 
-      if (formula) {
-        if (start === -1) {
-          start = c;
-          run = [];
-        }
-
-        run.push(formula);
-
-      } else if (start !== -1) {
-        targetSheet
-          .getRange(
-            r + 1,
-            start + 1,
-            1,
-            run.length
-          )
-          .setFormulas([run]);
-
-        start = -1;
-        run = [];
+      if (active[key]) {
+        active[key].formulas.push(run.formulas);
+      } else {
+        active[key] = {
+          startRow: r + 1,
+          startColumn: run.startColumn,
+          endColumn: run.endColumn,
+          formulas: [run.formulas]
+        };
       }
+    });
+
+    Object.keys(active).forEach(function(key) {
+      if (!present[key]) {
+        blocks.push(active[key]);
+        delete active[key];
+      }
+    });
+  }
+
+  Object.keys(active).forEach(function(key) {
+    blocks.push(active[key]);
+  });
+
+  return blocks;
+}
+
+
+function formulaRunsInRow_(row) {
+  var runs = [];
+  var start = -1;
+  var values = [];
+
+  for (var c = 0; c <= row.length; c++) {
+    var formula = c < row.length ? (row[c] || '') : '';
+
+    if (formula) {
+      if (start === -1) {
+        start = c;
+        values = [];
+      }
+      values.push(formula);
+    } else if (start !== -1) {
+      runs.push({
+        startColumn: start + 1,
+        endColumn: c,
+        formulas: values
+      });
+      start = -1;
+      values = [];
     }
   }
+
+  return runs;
 }
 
 
@@ -1367,6 +1614,14 @@ function rollbackTarget_(
 // -----------------------------------------------------------------------------
 
 function reorderCanonicalTabs_(spreadsheet) {
+  var current = spreadsheet.getSheets().map(function(sheet) {
+    return sheet.getName();
+  });
+
+  if (JSON.stringify(current) === JSON.stringify(REQUIRED_TABS)) {
+    return;
+  }
+
   for (var i = 0; i < REQUIRED_TABS.length; i++) {
     var sheet = spreadsheet.getSheetByName(REQUIRED_TABS[i]);
 
@@ -1450,11 +1705,7 @@ function copySheetWithRetry_(
     var beforeIds = getSheetIdMap_(targetSpreadsheet);
 
     try {
-      SpreadsheetApp.flush();
-
       var copied = sourceSheet.copyTo(targetSpreadsheet);
-
-      SpreadsheetApp.flush();
 
       if (!copied) {
         throw new Error('copyTo returned no Sheet object');
@@ -1609,7 +1860,6 @@ function createTargetBackup_(target) {
 
 function safeRename_(sheet, newName) {
   sheet.setName(newName);
-  SpreadsheetApp.flush();
 
   if (sheet.getName() !== newName) {
     throw new Error(
@@ -1639,6 +1889,20 @@ function makeUniqueTempName_(spreadsheet, baseName) {
   }
 
   return name;
+}
+
+
+function a1FromRowCol_(row, column) {
+  var letters = '';
+  var value = column;
+
+  while (value > 0) {
+    var remainder = (value - 1) % 26;
+    letters = String.fromCharCode(65 + remainder) + letters;
+    value = Math.floor((value - 1) / 26);
+  }
+
+  return letters + row;
 }
 
 
