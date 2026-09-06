@@ -20,7 +20,7 @@ Workbook schema `2.0.0` と互換の固定target Overwriter。
 
 - Workbook/Skill contract schema: `2.0.0`
 - Public workbook release: `2.2.0`
-- Skill package: `2.3.1`
+- Skill package: `2.3.2`
 - Task package: `2.2.0`
 - GAS implementation: `2.1.2`
 - Target Spreadsheet ID: `1ZGb__FQT25BPkzovq2UTfO4clvE7G71PiRm3yywSj6Y`

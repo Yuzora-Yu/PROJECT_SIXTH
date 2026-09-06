@@ -1,7 +1,7 @@
 # Gemini Spark — PROJECT SIXTH Prediction Ops
 
 Current public workbook release: **2.2.0**  
-Current Skill package: **2.3.1**  
+Current Skill package: **2.3.2**  
 Current Task package: **2.2.0**  
 Contract: `PROJECT_SIXTH_PREDICTION_OPS` / schema `2.0.0`
 
@@ -27,7 +27,7 @@ Gemini Spark upload packages: `packages/<skill-name>.zip`
 6. `verify-prediction-result-secondary`
 7. `settle-prediction-result`
 
-The package set is `2.3.1`. `audit-prediction-question` and `approve-prediction-publication` are `2.3.1`; the other five Skills remain `2.3.0`. Every upload ZIP contains root `SKILL.md`.
+The package set is `2.3.2`. `audit-prediction-question` is `2.3.2`, `approve-prediction-publication` is `2.3.1`, and the other five Skills remain `2.3.0`. T03 2.3.2 adds exact `prediction_id|version` row re-resolution, one-entity/one-row writes, replay fencing, and one-entity audit appends. Every upload ZIP contains root `SKILL.md`.
 
 ## Tasks / Schedule
 

@@ -205,7 +205,7 @@ bridgeは固定Spreadsheet ID、固定4レンジ、XLSX export、Action 1の定�
 - 本番ユーザーのアクセスを Spark / LLM の可用性に依存させない。
 - 報酬・経済値を Gemini に創作させない。
 
-## 固定Spreadsheet（public release 2.2.0 / Skill package 2.3.1）
+## 固定Spreadsheet（public release 2.2.0 / Skill package 2.3.2）
 
 Gemini Spark の予測運用は次の個人所有Google Sheetだけを正本として扱う。
 
@@ -220,4 +220,4 @@ Gemini Spark の予測運用は次の個人所有Google Sheetだけを正本と�
 
 全Skill/Taskはこのbase URLを内包する。Drive上の似た名前のSheetを検索・代替してはならない。アクセス不能、`05_CONFIG` のcontract/schema不一致、必要タブ欠落時はfail closedとし、別Sheetを作成・編集しない。`gid` は参照・契約に使用せず、処理対象タブはexact tab nameで指定する。
 
-Task本文は `gemini-spark/tasks/` の個別Markdownを登録用正本とする。Skill本文は `gemini-spark/skills/`、登録ZIPは `gemini-spark/packages/` を正本とする。Skill package 2.3.1では、2.3.0のappend-once + fail-closed規律を維持したまま、T03/T04へprimary source hard gateを追加する。`gemini-spark/` をcanonicalとし、mirror/package driftはCIと `npm run spark:sync:check` で検証する。
+Task本文は `gemini-spark/tasks/` の個別Markdownを登録用正本とする。Skill本文は `gemini-spark/skills/`、登録ZIPは `gemini-spark/packages/` を正本とする。Skill package 2.3.2では、2.3.1のprimary source hard gateを維持したまま、T03へ `prediction_id|version` のexact-row再解決、1 entity=1 exact-row write、replay fence、single-entity audit appendを追加する。T04は2.3.1の独立source gateを継続する。`gemini-spark/` をcanonicalとし、mirror/package driftはCIと `npm run spark:sync:check` で検証する。

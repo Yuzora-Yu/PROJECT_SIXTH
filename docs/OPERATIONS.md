@@ -7,7 +7,7 @@ Spreadsheet / Gemini Spark Skills / Tasks / GAS は同じcontractで運用する
 - contract_id: `PROJECT_SIXTH_PREDICTION_OPS`
 - schema_version: `2.0.0`
 - release_version: `2.2.0`
-- skill_package_version: `2.3.1`
+- skill_package_version: `2.3.2`
 - task_package_version: `2.2.0`
 - compatible GAS: `2.1.2`
 - target spreadsheet id: `1ZGb__FQT25BPkzovq2UTfO4clvE7G71PiRm3yywSj6Y`
@@ -46,6 +46,8 @@ T01 収集 → T02 ドラフト → T03 独立監査 → T04 掲載判定 → Gi
 - `09_RESULTS` は `prediction_id|version` を一意キーとしてcreate-or-update
 - 同一slotでのログ追記は precheck(unique id=0) → append once → verify(unique id=1)。不明/欠落/重複時はE017で停止し、追記retryしない
 - source成長は T1/T2 discover → T3 verify → T4 approve/promote
+- T03は `prediction_id|version` を論理キーとして毎entity書込直前に物理行を再解決し、1 entity = 1 exact-row write。cached row/offset/複数entity一括書込は禁止
+- T03 auditは1 entity = 1 rowでappendし、`audit_id` と `(run_id,entity_id,version,action)` の両方を事前・事後検証。replay/不明write outcomeはE017で停止
 - audit/run logはappend-only
 - Git Action 1: `prediction_id|version`
 - Git Action 2: `prediction_id|version|final_result`

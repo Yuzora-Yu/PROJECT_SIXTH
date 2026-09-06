@@ -2,7 +2,7 @@
   "release_version": "2.2.0",
   "contract_id": "PROJECT_SIXTH_PREDICTION_OPS",
   "schema_version": "2.0.0",
-  "skill_package_version": "2.3.1",
+  "skill_package_version": "2.3.2",
   "task_package_version": "2.2.0",
   "target_spreadsheet_id": "1ZGb__FQT25BPkzovq2UTfO4clvE7G71PiRm3yywSj6Y",
   "target_base_url": "https://docs.google.com/spreadsheets/d/1ZGb__FQT25BPkzovq2UTfO4clvE7G71PiRm3yywSj6Y/edit",

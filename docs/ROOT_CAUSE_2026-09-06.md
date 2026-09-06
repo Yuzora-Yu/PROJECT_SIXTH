@@ -96,3 +96,18 @@ When it is unavoidable, pause Spark schedules and the publication workflow first
 ## What is intentionally not repaired
 
 The historical T03 duplicate rows are not rewritten by this patch. They are evidence of the failure and the log is append-only. Action 1 no longer requires unrelated historical Spark audit IDs to be globally unique, while health warnings keep the defect visible.
+## Follow-up runtime incident: T03 row shift / replay (2026-09-06 evening)
+
+After the 2.3.1 source-gate hardening, one T03 run (`RUN-T03-20260906-170854-8ba4d1fd629981d7`) showed a separate write-target defect: audit decisions for PRED-029 through PRED-036 were valid by entity ID, but the `06_PREDICTIONS` T3 fields were written two physical rows lower. Two blank-ID rows received T3-owned values. The same run also replayed its eight audit rows, producing duplicate audit IDs. T04 2.3.1 detected the row mismatch and did not approve the affected CHECK_PASSED rows, preventing publication.
+
+T03 2.3.2 therefore adds structural guards rather than relying on list order:
+
+- `prediction_id|version` is the logical key; the physical row is exact-searched immediately before every write.
+- One prediction is written to one exact row. Cached row numbers, relative offsets, contiguous multi-entity writes, and writes to blank `prediction_id` rows are forbidden.
+- Written identity and T3 fields are re-read immediately after each entity write.
+- `t3_run_id=current run_id` acts as a replay fence.
+- Prediction audits are appended one entity/one row at a time, with both `audit_id` and `(run_id, entity_id, version, action)` pre/post uniqueness checks.
+- Ambiguous or replayed writes fail closed with E017; no compensating append or neighboring-row repair is attempted by the Skill.
+
+Historical duplicate audit rows remain append-only evidence and are not deleted.
+
