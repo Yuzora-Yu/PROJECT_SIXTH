@@ -1,5 +1,5 @@
 /**
- * PROJECT SIXTH Prediction Ops - Fixed Target Overwriter v2.1.1
+ * PROJECT SIXTH Prediction Ops - Fixed Target Overwriter v2.1.2
  * Contract: PROJECT_SIXTH_PREDICTION_OPS / schema 2.0.0
  *
  * HOTFIX v2.0.2:
@@ -28,10 +28,16 @@
  * - 運用データが予約行末へ近づいたら、key列(A)を基準にheadroomを自動追加。
  * - 追加行にはtemplate row由来のformat / validation / formulaを延長。
  * - ensureTargetCapacity() と任意の毎時capacity guard triggerを追加。
+ *
+ * HOTFIX v2.1.2:
+ * - installCapacityGuardTrigger()/removeCapacityGuardTrigger() 用に
+ *   appsscript.jsonへ script.scriptapp OAuth scope を追加。
+ * - ensureTargetCapacity() の開始/完了/拡張有無を実行ログへ明示。
+ * - trigger install/remove も実行ログへ明示。
  */
 
 var CONFIG = {
-  IMPLEMENTATION_VERSION: '2.1.1',
+  IMPLEMENTATION_VERSION: '2.1.2',
   CONTRACT_ID: 'PROJECT_SIXTH_PREDICTION_OPS',
   SCHEMA_VERSION: '2.0.0',
   TARGET_SPREADSHEET_ID: '1ZGb__FQT25BPkzovq2UTfO4clvE7G71PiRm3yywSj6Y',
@@ -1216,6 +1222,12 @@ function verifyExtendedFormulaColumns_(
  * Workbook全置換は行わない。
  */
 function ensureTargetCapacity() {
+  var startedAt = Date.now();
+  console.log(
+    'ensureTargetCapacity START | implementation=' +
+    CONFIG.IMPLEMENTATION_VERSION
+  );
+
   var lock = LockService.getScriptLock();
 
   if (!lock.tryLock(CONFIG.LOCK_WAIT_MS)) {
@@ -1230,16 +1242,42 @@ function ensureTargetCapacity() {
 
     SpreadsheetApp.flush();
 
-    return {
+    if (expansions.length === 0) {
+      console.log(
+        'ensureTargetCapacity OK | expansion=NONE | 現在の予約行に十分な余裕があります。'
+      );
+    } else {
+      expansions.forEach(function(item) {
+        console.log(
+          'capacity expanded | sheet=' + item.sheet +
+          ' | liveLastRow=' + item.liveLastRow +
+          ' | oldMaxRows=' + item.oldMaxRows +
+          ' | newMaxRows=' + item.newMaxRows +
+          ' | headroom=' + item.headroom
+        );
+      });
+    }
+
+    var result = {
       ok: true,
       implementationVersion: CONFIG.IMPLEMENTATION_VERSION,
       expansions: expansions,
+      elapsedSeconds: Math.round((Date.now() - startedAt) / 100) / 10,
       checkedAtJst: Utilities.formatDate(
         new Date(),
         CONFIG.TARGET_TIME_ZONE,
         "yyyy-MM-dd'T'HH:mm:ssXXX"
       )
     };
+
+    console.log(
+      'ensureTargetCapacity DONE | expansions=' +
+      expansions.length +
+      ' | elapsedSeconds=' +
+      result.elapsedSeconds
+    );
+
+    return result;
   } finally {
     lock.releaseLock();
   }
@@ -1261,7 +1299,12 @@ function capacityGuard() {
 
 /** 1回だけ手動実行すると、毎時capacityGuardを登録する。 */
 function installCapacityGuardTrigger() {
-  removeCapacityGuardTrigger();
+  console.log(
+    'installCapacityGuardTrigger START | implementation=' +
+    CONFIG.IMPLEMENTATION_VERSION
+  );
+
+  var removeResult = removeCapacityGuardTrigger();
 
   ScriptApp
     .newTrigger('capacityGuard')
@@ -1269,11 +1312,26 @@ function installCapacityGuardTrigger() {
     .everyHours(1)
     .create();
 
-  return {ok: true, trigger: 'capacityGuard', cadence: 'hourly'};
+  var result = {
+    ok: true,
+    trigger: 'capacityGuard',
+    cadence: 'hourly',
+    replacedExistingTriggers: removeResult.removed
+  };
+
+  console.log(
+    'installCapacityGuardTrigger DONE | trigger=capacityGuard' +
+    ' | cadence=hourly' +
+    ' | removedExisting=' + removeResult.removed
+  );
+
+  return result;
 }
 
 
 function removeCapacityGuardTrigger() {
+  console.log('removeCapacityGuardTrigger START');
+
   var removed = 0;
   ScriptApp.getProjectTriggers().forEach(function(trigger) {
     if (trigger.getHandlerFunction() === 'capacityGuard') {
@@ -1281,6 +1339,11 @@ function removeCapacityGuardTrigger() {
       removed++;
     }
   });
+
+  console.log(
+    'removeCapacityGuardTrigger DONE | removed=' + removed
+  );
+
   return {ok: true, removed: removed};
 }
 
