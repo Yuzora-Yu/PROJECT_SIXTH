@@ -3,7 +3,10 @@
 gemini-spark/tasks/*.md text eol=lf
 spark/tasks/*.md text eol=lf
 gemini-spark/skills/*/SKILL.md text eol=lf
+spark/skills/*/contracts/*.md text eol=lf
+gemini-spark/skills/*/contracts/*.md text eol=lf
 spark/skills/*/SKILL.md text eol=lf
+spark/skills/*/contracts/*.md text eol=lf
 scripts/sync-spark-skills.py text eol=lf
 tests/test_spark_skill_sync.py text eol=lf
 

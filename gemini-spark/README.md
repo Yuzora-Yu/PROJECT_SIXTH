@@ -1,8 +1,12 @@
+# PROJECT SIXTH Gemini Spark package v2.4.0
+
+Deterministic I/O: all Skills are v2.4.0, all Tasks are runtime-pinned, each Task owns dedicated AUDIT/RUN lanes, Sheet formulas own cursors, and pure scheduled NOOP uses heartbeat only. Public prediction catalog release remains 2.2.0.
+
 # Gemini Spark — PROJECT SIXTH Prediction Ops
 
 Current public workbook release: **2.2.0**  
-Current Skill package: **2.3.3**  
-Current Task package: **2.2.1**  
+Current Skill package: **2.4.0**  
+Current Task package: **2.4.0**  
 Contract: `PROJECT_SIXTH_PREDICTION_OPS` / schema `2.0.0`
 
 ## Fixed production Spreadsheet
@@ -27,7 +31,7 @@ Gemini Spark upload packages: `packages/<skill-name>.zip`
 6. `verify-prediction-result-secondary`
 7. `settle-prediction-result`
 
-The package set is `2.3.3`. `audit-prediction-question` is `2.3.3`, `approve-prediction-publication` is `2.3.1`, and the other five Skills remain `2.3.0`. T03 v2.3.3 pins runtime identity, uses exact entity-row writes, isolates entity error fields, and writes AUDIT/RUN logs only to an explicit physical tail+1 row. Task package 2.2.1 pins T03 to `T03@2.3.3`. Every upload ZIP contains root `SKILL.md`.
+The package set is `2.4.0`. All seven Skills use runtime 2.4.0. Every Skill ZIP contains root `SKILL.md` plus five mandatory `contracts/*.md` files. T01–T08 Tasks are runtime-pinned to `Txx@2.4.0`. Physical log placement is not inferred by Spark: each Task owns a dedicated AUDIT/RUN lane and reads a Sheet-owned next-row cursor from `05_CONFIG`. Scheduled pure NOOP updates only the Task heartbeat in `04_SCHEDULES`.
 
 ## Tasks / Schedule
 

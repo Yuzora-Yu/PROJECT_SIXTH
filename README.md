@@ -44,6 +44,11 @@ npm run predictions:import
 npm run predictions:check
 ```
 
+## Gemini Spark 運用ランタイム
+
+現実予測のバックオフィスSpark運用は **runtime 2.4.0 / public catalog release 2.2.0**。全Task runtime pin、logical-key exact-row、Task専用ログlane、Sheet-owned cursor、heartbeatを使用します。詳細は `docs/SPARK_RUNTIME_V2.4.0.md` と `gemini-spark/` を正本とします。
+
+
 ## 検証
 
 ```powershell

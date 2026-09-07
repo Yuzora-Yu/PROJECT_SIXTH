@@ -18,3 +18,7 @@
 5. A terminal RUN_LOG row is mandatory on SUCCESS, NOOP, or fail-closed ERROR.
 6. Error state is reset per entity. Primary-source publication ineligibility uses E022; resolution mismatch uses E019.
 7. Historical duplicate audit rows are preserved as evidence; overwritten historical audit rows are restored by ADMIN_REPAIR rather than deleting or rewriting existing rows.
+
+## Superseded by Spark Runtime 2.4.0
+
+The v2.3.x controls above are retained as incident history. Runtime 2.4.0 replaces shared/global log-tail selection with Task-specific AUDIT/RUN lanes and Sheet-owned cursors, and extends runtime pinning/exact-row/postcheck behavior to all Tasks. See `docs/SPARK_RUNTIME_V2.4.0.md`.

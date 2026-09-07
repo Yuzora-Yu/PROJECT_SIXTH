@@ -7,8 +7,8 @@ Spreadsheet / Gemini Spark Skills / Tasks / GAS は同じcontractで運用する
 - contract_id: `PROJECT_SIXTH_PREDICTION_OPS`
 - schema_version: `2.0.0`
 - release_version: `2.2.0`
-- skill_package_version: `2.3.3`
-- task_package_version: `2.2.1`
+- skill_package_version: `2.4.0`
+- task_package_version: `2.4.0`
 - compatible GAS: `2.1.2`
 - target spreadsheet id: `1ZGb__FQT25BPkzovq2UTfO4clvE7G71PiRm3yywSj6Y`
 - target base URL: `https://docs.google.com/spreadsheets/d/1ZGb__FQT25BPkzovq2UTfO4clvE7G71PiRm3yywSj6Y/edit`
@@ -44,8 +44,10 @@ T01 収集 → T02 ドラフト → T03 独立監査 → T04 掲載判定 → Gi
 - fail closed
 - T5/T6は独立確認
 - `09_RESULTS` は `prediction_id|version` を一意キーとしてcreate-or-update
-- T03のログ追記は「first blank」やimplicit appendを使わず、column Aの最終非空物理行+1へ1行の明示range writeを行う。interior blankは触らない。pre/postで旧tail不変・新row完全一致・ID一意を検証し、不明/欠落/重複時はE017で停止する
-- T03は `Required Skill Runtime=T03@2.3.3` と `05_CONFIG.t3_required_skill_version=2.3.3` を実行前に一致確認する。旧runtimeなら書込前にFAIL CLOSED
+- T01〜T08は共有global tail/first blankを使わず、`05_CONFIG` のTask専用AUDIT/RUN laneとSheet-owned cursorだけを使う。書込前にcursorと対象row空欄を再確認し、1行明示write後にcursor+1とID一意性を検証する。
+- 全Taskは `Required Skill Runtime=Txx@2.4.0`・active Skill runtime・`05_CONFIG.txx_required_skill_version=2.4.0` の3点一致を実行前に確認する。旧runtime/確認不能はE024で書込前FAIL CLOSED。
+- `04_SCHEDULES` H:NをTask heartbeatとする。scheduled pure NOOPはheartbeatのみ。manual NOOP・業務変更・HOLD/ERRORはTask RUN laneへterminal rowを1件＋heartbeat。
+- terminal直前にeligible worksetを再検索し、残件主張との矛盾はE025で停止する。
 - source成長は T1/T2 discover → T3 verify → T4 approve/promote
 - audit/run logはappend-only
 - Git Action 1: `prediction_id|version`
@@ -57,8 +59,6 @@ T01 収集 → T02 ドラフト → T03 独立監査 → T04 掲載判定 → Gi
 
 ## Versioning rule
 
-構造契約を変更する場合は `schema_version` を上げる。Prompt・Task文・validation・QA等の互換修正は `release_version` / package versionを上げ、Spreadsheet / Skills / Tasksを同時更新する。GASのtransport/verification patchはcontract互換ならimplementation versionだけを上げられる。
+構造契約を破壊的に変更する場合だけ `schema_version` を上げる。公開Prediction Catalog自体を変更しないSkill/Task/runtime hardeningでは `release_version=2.2.0` を維持し、`skill_package_version` / `task_package_version` / `runtime_hardening_version` を更新する。GASのtransport/verification patchはcontract互換ならimplementation versionだけを上げられる。
 
-T03 runtime hardening 2.3.3: exact-row entity targeting、physical-tail+1 log write、terminal RUN_LOG、entity-local error state、E022 source-gate分類を適用。
-
-Static QA release 2.1.0: 89/89 PASS。次の境界はGemini Spark runtime verification。
+Spark Runtime 2.4.0: 全Task runtime pin、logical-key exact-row、Task専用log lane、Sheet-owned cursor、heartbeat、scheduled pure NOOP heartbeat-only、terminal workset recountを共通化。

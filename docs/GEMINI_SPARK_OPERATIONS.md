@@ -1,7 +1,11 @@
+# Gemini Spark Operations — Deterministic I/O v2.4.0
+
+PROJECT_SIXTH uses Spark for semantic judgment and exact keyed entity updates, while Sheet formulas own physical log cursors. Every Task has its own AUDIT/RUN lane. Scheduled pure NOOP updates only the fixed heartbeat row. Runtime is pinned by Task token + active Skill + 05_CONFIG, and every terminal path re-counts the eligible workset.
+
 # Gemini Spark 運用仕様 — Reality Prediction Ops
 
 確認日: 2026-09-05
-対象: PROJECT SIXTH 現実予測運用 / release 2.1.0 / schema 2.0.0
+対象: PROJECT SIXTH 現実予測運用 / public release 2.2.0 / Spark runtime 2.4.0 / schema 2.0.0
 
 ## 1. この文書の目的
 
@@ -205,7 +209,7 @@ bridgeは固定Spreadsheet ID、固定4レンジ、XLSX export、Action 1の定�
 - 本番ユーザーのアクセスを Spark / LLM の可用性に依存させない。
 - 報酬・経済値を Gemini に創作させない。
 
-## 固定Spreadsheet（public release 2.2.0 / Skill package 2.3.3 / Task package 2.2.1）
+## 固定Spreadsheet（public release 2.2.0 / Skill package 2.4.0 / Task package 2.4.0）
 
 Gemini Spark の予測運用は次の個人所有Google Sheetだけを正本として扱う。
 
@@ -220,4 +224,4 @@ Gemini Spark の予測運用は次の個人所有Google Sheetだけを正本と�
 
 全Skill/Taskはこのbase URLを内包する。Drive上の似た名前のSheetを検索・代替してはならない。アクセス不能、`05_CONFIG` のcontract/schema不一致、必要タブ欠落時はfail closedとし、別Sheetを作成・編集しない。`gid` は参照・契約に使用せず、処理対象タブはexact tab nameで指定する。
 
-Task本文は `gemini-spark/tasks/` の個別Markdownを登録用正本とする。Skill本文は `gemini-spark/skills/`、登録ZIPは `gemini-spark/packages/` を正本とする。Skill package 2.3.3では、T03を2.3.3へ更新し、prediction_id+version exact-row書込、entity-local error state、physical-tail+1の明示log write、terminal RUN_LOGを必須化する。T04は2.3.1のprimary source hard gateを維持する。Task package 2.2.1ではT03に `Required Skill Runtime=T03@2.3.3` を固定し、旧runtime選択時は書込前にFAIL CLOSEDする。`gemini-spark/` をcanonicalとし、mirror/package driftはCIと `npm run spark:sync:check` で検証する。
+Task本文は `gemini-spark/tasks/` の個別Markdownを登録用正本とする。Skill本文は `gemini-spark/skills/`、登録ZIPは `gemini-spark/packages/` を正本とする。Skill package / Task package 2.4.0では全Taskを `Txx@2.4.0` へruntime pinし、各Skill ZIPの `contracts/*.md` を必須契約として読む。業務rowはlogical keyから書込直前に再解決し、ログはT01〜T08の専用AUDIT/RUN laneと `05_CONFIG` Sheet-owned cursorだけを使う。scheduled pure NOOPは `04_SCHEDULES` heartbeatのみ。Skill差替え後は各Scheduled Taskで最新Skillを再選択して保存する。`gemini-spark/` をcanonicalとし、mirror/package driftはCIと `npm run spark:sync:check` で検証する。

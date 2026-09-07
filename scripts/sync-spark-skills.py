@@ -55,25 +55,35 @@ def version_tuple(value: str) -> tuple[int, int, int]:
     return tuple(int(part) for part in value.split("."))  # type: ignore[return-value]
 
 
-def package_bytes(canonical: bytes) -> bytes:
-    from io import BytesIO
+def skill_files(root: Path, name: str) -> dict[str, bytes]:
+    skill_root = root / name
+    files: dict[str, bytes] = {}
+    for path in sorted(p for p in skill_root.rglob("*") if p.is_file()):
+        files[path.relative_to(skill_root).as_posix()] = path.read_bytes()
+    if "SKILL.md" not in files:
+        raise ValueError(f"{name}: missing SKILL.md")
+    return files
 
+
+def package_bytes(files: dict[str, bytes]) -> bytes:
+    from io import BytesIO
     buffer = BytesIO()
-    info = zipfile.ZipInfo("SKILL.md", date_time=(1980, 1, 1, 0, 0, 0))
-    info.compress_type = zipfile.ZIP_DEFLATED
-    info.external_attr = 0o100644 << 16
     with zipfile.ZipFile(buffer, "w") as archive:
-        archive.writestr(info, canonical)
+        for rel, data in sorted(files.items()):
+            info = zipfile.ZipInfo(rel, date_time=(1980, 1, 1, 0, 0, 0))
+            info.compress_type = zipfile.ZIP_DEFLATED
+            info.external_attr = 0o100644 << 16
+            archive.writestr(info, data)
     return buffer.getvalue()
 
 
-def expected_state() -> tuple[dict[str, bytes], str]:
-    skills: dict[str, bytes] = {}
+def expected_state() -> tuple[dict[str, dict[str, bytes]], str]:
+    skills: dict[str, dict[str, bytes]] = {}
     versions: list[str] = []
     for name in SKILL_NAMES:
-        canonical = (CANONICAL_SKILLS / name / "SKILL.md").read_bytes()
-        versions.append(parse_frontmatter(canonical, name))
-        skills[name] = canonical
+        files = skill_files(CANONICAL_SKILLS, name)
+        versions.append(parse_frontmatter(files["SKILL.md"], name))
+        skills[name] = files
     return skills, max(versions, key=version_tuple)
 
 
@@ -84,15 +94,20 @@ def check() -> list[str]:
     except (OSError, ValueError) as error:
         return [str(error)]
 
-    for name, canonical in skills.items():
-        mirror = MIRROR_SKILLS / name / "SKILL.md"
-        if not mirror.exists() or mirror.read_bytes() != canonical:
-            errors.append(f"mirror drift: spark/skills/{name}/SKILL.md")
+    for name, canonical_files in skills.items():
+        try:
+            mirror_files = skill_files(MIRROR_SKILLS, name)
+        except (OSError, ValueError):
+            mirror_files = {}
+        if mirror_files != canonical_files:
+            errors.append(f"mirror drift: spark/skills/{name}")
+        expected_names = sorted(canonical_files)
         for package_root in PACKAGE_ROOTS:
             path = package_root / f"{name}.zip"
             try:
                 with zipfile.ZipFile(path) as archive:
-                    if archive.namelist() != ["SKILL.md"] or archive.read("SKILL.md") != canonical:
+                    actual_names = sorted(n for n in archive.namelist() if not n.endswith("/"))
+                    if actual_names != expected_names or any(archive.read(rel) != data for rel, data in canonical_files.items()):
                         errors.append(f"package drift: {path.relative_to(ROOT)}")
             except (OSError, zipfile.BadZipFile, KeyError):
                 errors.append(f"package drift: {path.relative_to(ROOT)}")
@@ -131,25 +146,20 @@ def check() -> list[str]:
 
 def sync() -> str:
     skills, package_version = expected_state()
-    for name, canonical in skills.items():
-        mirror = MIRROR_SKILLS / name / "SKILL.md"
-        mirror.parent.mkdir(parents=True, exist_ok=True)
-        mirror.write_bytes(canonical)
-        expected_zip = package_bytes(canonical)
+    for name, canonical_files in skills.items():
+        mirror_root = MIRROR_SKILLS / name
+        if mirror_root.exists():
+            for path in sorted((p for p in mirror_root.rglob("*") if p.is_file()), reverse=True):
+                path.unlink()
+        for rel, data in canonical_files.items():
+            dest = mirror_root / rel
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            dest.write_bytes(data)
+        expected_zip = package_bytes(canonical_files)
         for package_root in PACKAGE_ROOTS:
             package_root.mkdir(parents=True, exist_ok=True)
             path = package_root / f"{name}.zip"
-            current_ok = False
-            if path.exists():
-                try:
-                    with zipfile.ZipFile(path) as archive:
-                        current_ok = (
-                            archive.namelist() == ["SKILL.md"]
-                            and archive.read("SKILL.md") == canonical
-                        )
-                except (OSError, zipfile.BadZipFile, KeyError):
-                    current_ok = False
-            if not current_ok:
+            if not path.exists() or path.read_bytes() != expected_zip:
                 path.write_bytes(expected_zip)
 
     MIRROR_TASKS.mkdir(parents=True, exist_ok=True)
