@@ -2,8 +2,8 @@
   "release_version": "2.2.0",
   "contract_id": "PROJECT_SIXTH_PREDICTION_OPS",
   "schema_version": "2.0.0",
-  "skill_package_version": "2.4.0",
-  "task_package_version": "2.4.0",
+  "skill_package_version": "2.4.1",
+  "task_package_version": "2.4.1",
   "target_spreadsheet_id": "1ZGb__FQT25BPkzovq2UTfO4clvE7G71PiRm3yywSj6Y",
   "target_base_url": "https://docs.google.com/spreadsheets/d/1ZGb__FQT25BPkzovq2UTfO4clvE7G71PiRm3yywSj6Y/edit",
   "timezone": "Asia/Tokyo",
@@ -38,21 +38,21 @@
   "same_slot_policy": "NO_ORDER_DEPENDENCY",
   "result_row_key": "prediction_id|version",
   "source_growth_policy": "T1_T2_DISCOVER__T3_VERIFY__T4_APPROVE",
-  "runtime_hardening_version": "2.4.0",
-  "log_lane_contract_version": "2.0.0",
+  "runtime_hardening_version": "2.4.1",
+  "log_lane_contract_version": "2.1.0",
   "pure_scheduled_noop_policy": "HEARTBEAT_ONLY",
   "manual_noop_policy": "RUN_LOG_AND_HEARTBEAT",
-  "heartbeat_policy": "04_SCHEDULES_EXACT_TASK_ROW_H_TO_N",
+  "heartbeat_policy": "FIXED_A1_RANGE_WITH_AB_GUARD_EXACT_WRITE",
   "workset_postcheck_policy": "RECOUNT_ELIGIBLE_BEFORE_TERMINAL",
   "task_required_skill_versions": {
-    "T01": "2.4.0",
-    "T02": "2.4.0",
-    "T03": "2.4.0",
-    "T04": "2.4.0",
-    "T05": "2.4.0",
-    "T06": "2.4.0",
-    "T07": "2.4.0",
-    "T08": "2.4.0"
+    "T01": "2.4.1",
+    "T02": "2.4.1",
+    "T03": "2.4.1",
+    "T04": "2.4.1",
+    "T05": "2.4.1",
+    "T06": "2.4.1",
+    "T07": "2.4.1",
+    "T08": "2.4.1"
   },
   "log_lanes": {
     "LEGACY": [
@@ -93,8 +93,53 @@
     ]
   },
   "log_cursor_source": "05_CONFIG_TASK_LANE_SHEET_FORMULA",
-  "log_write_policy": "READ_LANE_CURSOR__RECHECK_BLANK__SINGLE_EXACT_ROW__VERIFY_PLUS_ONE",
+  "log_write_policy": "READ_LANE_CURSOR__RECHECK_BLANK__SINGLE_EXACT_ROW__DIRECT_READBACK__LANE_LOCAL_ID_ONE",
   "runtime_mismatch_error_code": "E024",
   "workset_postcheck_error_code": "E025",
-  "lane_capacity_error_code": "E026"
+  "lane_capacity_error_code": "E026",
+  "cursor_postwrite_policy": "ADVISORY_ONLY_NOT_SUCCESS_CRITERION",
+  "stale_cursor_start_policy": "IF_TARGET_NONBLANK_DIRECT_CURSOR_REREAD_ONCE_THEN_E023",
+  "heartbeat_error_code": "E027",
+  "heartbeat_targets": {
+    "T01": {
+      "target": "04_SCHEDULES!H4:N4",
+      "guard_range": "04_SCHEDULES!A4:B4",
+      "guard": "SC01|T01"
+    },
+    "T02": {
+      "target": "04_SCHEDULES!H5:N5",
+      "guard_range": "04_SCHEDULES!A5:B5",
+      "guard": "SC02|T02"
+    },
+    "T03": {
+      "target": "04_SCHEDULES!H6:N6",
+      "guard_range": "04_SCHEDULES!A6:B6",
+      "guard": "SC03|T03"
+    },
+    "T04": {
+      "target": "04_SCHEDULES!H7:N7",
+      "guard_range": "04_SCHEDULES!A7:B7",
+      "guard": "SC04|T04"
+    },
+    "T05": {
+      "target": "04_SCHEDULES!H8:N8",
+      "guard_range": "04_SCHEDULES!A8:B8",
+      "guard": "SC05|T05"
+    },
+    "T06": {
+      "target": "04_SCHEDULES!H9:N9",
+      "guard_range": "04_SCHEDULES!A9:B9",
+      "guard": "SC06|T06"
+    },
+    "T07": {
+      "target": "04_SCHEDULES!H10:N10",
+      "guard_range": "04_SCHEDULES!A10:B10",
+      "guard": "SC07|T07"
+    },
+    "T08": {
+      "target": "04_SCHEDULES!H11:N11",
+      "guard_range": "04_SCHEDULES!A11:B11",
+      "guard": "SC08|T08"
+    }
+  }
 }

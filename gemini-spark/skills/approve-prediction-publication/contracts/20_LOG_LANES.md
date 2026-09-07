@@ -1,4 +1,4 @@
-# Deterministic log lanes
+# Deterministic log lanes — v2.4.1
 
 `11_AUDIT_LOG` and `12_RUN_LOG` are append-only evidence, but Spark never chooses a global tail. Each Task owns one physical lane in each log sheet.
 
@@ -13,12 +13,14 @@
 
 For Task Txx, read only `05_CONFIG.txx_audit_next_write_row` and `05_CONFIG.txx_run_next_write_row`. The formulas are Sheet-owned and read-only to Skills.
 
-For every audit/run record:
-1. Read the lane mapping and cursor. Cursor `0`, cursor outside the lane, or missing mapping is `E026`/`E023`.
-2. Exact-search the record ID globally and require count 0 before a fresh write.
-3. Immediately before writing, re-read the cursor and the complete target row; require the same cursor and a completely blank target schema row.
-4. Write exactly one explicit row range in the Task's own lane. Never use implicit append, table append, first blank, global tail, or another Task's lane.
-5. Read back the target row and verify the cursor advanced by exactly +1. Exact-search the record ID and require count 1. Otherwise `E023`/`E017`, no compensating write.
-6. Never retry an ambiguous write to a different row or with a different ID.
+For every fresh audit/run record:
+1. Read the Task lane mapping and the task-specific cursor by exact config key. Cursor `0`, missing mapping, or cursor outside the Task lane is `E026`/`E023`.
+2. Search **only inside the Task's own lane** for the fresh `audit_id` or `run_id`; require count `0` before writing. Do not use a whole-sheet/global search as the primary write-outcome check.
+3. Immediately before writing, directly read the complete target row at the cursor and require the authoritative ID cell A to be blank. If it is nonblank, directly re-read the same cursor config cell once; if the same occupied target remains, return `E023`. Never choose another row, first blank, or global tail.
+4. Write exactly one explicit schema row in the Task's own lane: A:P for audit or A:O for run. Never use implicit append, table append, first blank, global tail, or another Task's lane.
+5. **Primary success check:** directly re-read the exact row just written and require every written field to match the intended payload.
+6. **Secondary uniqueness check:** search only the Task lane for the exact `audit_id`/`run_id` and require count `1`. Count `0`/`>1` is `E023`/`E017`.
+7. The Sheet formula cursor advancing immediately by `+1` is **advisory only**, because formula recalculation/read caching can lag. Cursor non-advance by itself is NOT a write failure if steps 5–6 pass.
+8. On the next write attempt, an occupied cursor target is handled by step 3. Never compensate to a different row or a different ID.
 
-Audit schema is A:P (16 fields). Run schema is A:O (15 fields). Existing historical duplicates remain evidence and are not rewritten.
+Existing historical duplicates remain evidence and are not rewritten.

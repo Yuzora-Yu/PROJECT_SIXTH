@@ -1,7 +1,7 @@
 ---
 name: verify-prediction-result-secondary
 description: T5と独立したsourceまたは経路で結果を照合し、T6証拠だけを記録する。
-version: 2.4.0
+version: 2.4.1
 ---
 
 # verify-prediction-result-secondary
@@ -15,17 +15,17 @@ Required tabs: `05_CONFIG`, `06_PREDICTIONS`, `07_SOURCE_MASTER`, `09_RESULTS`, 
 - Target base URL: `https://docs.google.com/spreadsheets/d/1ZGb__FQT25BPkzovq2UTfO4clvE7G71PiRm3yywSj6Y/edit`
 - Contract ID: `PROJECT_SIXTH_PREDICTION_OPS`
 - Schema version: `2.0.0`
-- Runtime version: `2.4.0`
+- Runtime version: `2.4.1`
 - Timezone: `Asia/Tokyo`
 - GID dependency: `NONE`
 
 Before any operational Sheet write, read **all five** packaged support files in `contracts/`: `00_RUNTIME_CONTRACT.md`, `10_SHEET_IO.md`, `20_LOG_LANES.md`, `30_STATE_MACHINE.md`, `40_ERROR_POLICY.md`. Their requirements are mandatory and supplement this SKILL.md.
 
-Open only the fixed Spreadsheet above. Verify `contract_id`, `schema_version`, `spark_sheet_id`, `spark_sheet_url`, `gid_dependency`, `skill_package_version=2.4.0`, `task_package_version=2.4.0`, and `runtime_hardening_version=2.4.0`. Never use a gid URL, similarly named workbook, replacement workbook, or Drive fallback.
+Open only the fixed Spreadsheet above. Verify `contract_id`, `schema_version`, `spark_sheet_id`, `spark_sheet_url`, `gid_dependency`, `skill_package_version=2.4.1`, `task_package_version=2.4.1`, and `runtime_hardening_version=2.4.1`, and `log_cursor_contract_version=2.1.0`. Never use a gid URL, similarly named workbook, replacement workbook, or Drive fallback.
 
 ## Runtime / Task binding
 
-This Skill runtime is exactly `2.4.0`. The invoking prompt must provide one allowed Task ID and the literal token `Required Skill Runtime=<TaskID>@2.4.0`. Exact-search `05_CONFIG` for `<taskid lower>_required_skill_version` and require `2.4.0`. The active runtime, Task token, and Sheet value must all match. Otherwise return `E024` and FAIL CLOSED before business writes.
+This Skill runtime is exactly `2.4.1`. The invoking prompt must provide one allowed Task ID and the literal token `Required Skill Runtime=<TaskID>@2.4.1`. Exact-search `05_CONFIG` for `<taskid lower>_required_skill_version` and require `2.4.1`. The active runtime, Task token, and Sheet value must all match. Otherwise return `E024` and FAIL CLOSED before business writes.
 
 Generate one random 16-hex run nonce and one run_id `RUN-<TaskID>-YYYYMMDD-HHMMSS-<nonce>` per invocation. Never reuse short suffixes.
 
@@ -35,9 +35,10 @@ Generate one random 16-hex run nonce and one run_id `RUN-<TaskID>-YYYYMMDD-HHMMS
 - After every business write, exact-search and read back identity plus written fields.
 - Never directly write `06_PREDICTIONS!AQ:AR`.
 - Logs use only the current Task's dedicated lane and Sheet-owned cursor from `05_CONFIG`; never global tail/first blank/implicit append.
-- Each audit_id is `AUD-<TaskID>-YYYYMMDD-HHMMSS-<nonce>-<4 digit sequence>` and is globally exact-searched before and after its single explicit-row write. Audit rows are one entity at a time.
-- Update heartbeat only on the exact `04_SCHEDULES` row whose task_id equals the current Task.
-- Scheduled pure NOOP => heartbeat only. Manual NOOP or any changed/HOLD/ERROR run => exactly one terminal RUN_LOG row in the Task's run lane plus heartbeat.
+- Each audit_id is `AUD-<TaskID>-YYYYMMDD-HHMMSS-<nonce>-<4 digit sequence>`. Pre/post uniqueness checks are limited to the Task's own lane. After write, the exact target row is directly re-read and must match the full payload.
+- Cursor `+1` immediately after a log write is advisory only; do not call a successful exact-row write failed merely because formula recalculation/read caching has not advanced the cursor yet.
+- Heartbeat uses only the literal fixed A1 target and literal guard in the Task text/`05_CONFIG`. Never search `04_SCHEDULES` to derive a row and never add/subtract a row offset.
+- Scheduled pure NOOP => fixed heartbeat only. Manual NOOP or any changed/HOLD/ERROR run => exactly one terminal RUN_LOG row in the Task's run lane plus fixed heartbeat.
 - Immediately before terminal completion, re-count the eligible workset and report the real remaining count in the note. A contradiction is `E025`.
 - URL fields accept only http(s) URLs or blank. `SUCCESS`/`NOOP` run rows keep error fields blank.
 

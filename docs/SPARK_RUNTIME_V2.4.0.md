@@ -1,5 +1,8 @@
 # PROJECT SIXTH Spark Runtime 2.4.0 — Deterministic I/O
 
+> Superseded by `docs/SPARK_RUNTIME_V2.4.1.md` for heartbeat targeting and post-write verification. The Task-lane architecture itself remains valid.
+
+
 Public Prediction Catalog release remains **2.2.0**. Workbook schema remains **2.0.0**. This release changes Spark runtime/Task/logging behavior only.
 
 ## Design boundary

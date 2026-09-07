@@ -1,12 +1,12 @@
-# PROJECT SIXTH Gemini Spark package v2.4.0
+# PROJECT SIXTH Gemini Spark package v2.4.1
 
-Deterministic I/O: all Skills are v2.4.0, all Tasks are runtime-pinned, each Task owns dedicated AUDIT/RUN lanes, Sheet formulas own cursors, and pure scheduled NOOP uses heartbeat only. Public prediction catalog release remains 2.2.0.
+Deterministic I/O: all Skills are v2.4.1, all Tasks are runtime-pinned, each Task owns dedicated AUDIT/RUN lanes, log writes use exact-row direct readback + lane-local ID uniqueness, and heartbeat uses literal A1 targets with A:B guards. Cursor +1 is advisory after write. Public prediction catalog release remains 2.2.0.
 
 # Gemini Spark — PROJECT SIXTH Prediction Ops
 
 Current public workbook release: **2.2.0**  
-Current Skill package: **2.4.0**  
-Current Task package: **2.4.0**  
+Current Skill package: **2.4.1**  
+Current Task package: **2.4.1**  
 Contract: `PROJECT_SIXTH_PREDICTION_OPS` / schema `2.0.0`
 
 ## Fixed production Spreadsheet
@@ -31,7 +31,7 @@ Gemini Spark upload packages: `packages/<skill-name>.zip`
 6. `verify-prediction-result-secondary`
 7. `settle-prediction-result`
 
-The package set is `2.4.0`. All seven Skills use runtime 2.4.0. Every Skill ZIP contains root `SKILL.md` plus five mandatory `contracts/*.md` files. T01–T08 Tasks are runtime-pinned to `Txx@2.4.0`. Physical log placement is not inferred by Spark: each Task owns a dedicated AUDIT/RUN lane and reads a Sheet-owned next-row cursor from `05_CONFIG`. Scheduled pure NOOP updates only the Task heartbeat in `04_SCHEDULES`.
+The package set is `2.4.1`. All seven Skills use runtime 2.4.1. Every Skill ZIP contains root `SKILL.md` plus five mandatory `contracts/*.md` files. T01–T08 Tasks are runtime-pinned to `Txx@2.4.1`. Physical log placement is not inferred by Spark: each Task owns a dedicated AUDIT/RUN lane and reads a Sheet-owned next-row cursor from `05_CONFIG`. Scheduled pure NOOP updates only the Task heartbeat in `04_SCHEDULES`. Heartbeat rows are literal per Task (for example T05 = `H8:N8`, guard `A8:B8 = SC05/T05`) and are never derived from search-result position or relative offset.
 
 ## Tasks / Schedule
 
