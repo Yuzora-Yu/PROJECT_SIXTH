@@ -537,5 +537,100 @@ export const rawPredictionCatalog = Object.freeze([
       "name": "気象庁 公式ポータル・各種データ",
       "url": "https://www.jma.go.jp/jma/menu/menureport.html"
     }
+  },
+  {
+    "id": "PRED-20260905-036",
+    "version": 1,
+    "category": "POLITICS",
+    "horizon": "SHORT",
+    "question": "2026年9月30日24:00までに首相官邸公式ウェブサイトにおいて、内閣総理大臣の国連総会出席等に伴う海外訪問日程の公式発表が行われるか？",
+    "choices": [
+      "公式発表あり",
+      "公式発表なし"
+    ],
+    "resolutionRule": "首相官邸公式ウェブサイトにおいて9月30日23:59:59 JSTまでに国連総会等外遊日程の公式発表が行われたかで判定。公式発表ありなら選択肢a、なしは選択肢b。Asia/Tokyo。",
+    "publishAt": "2026-09-07T19:00:00+09:00",
+    "closeAt": "2026-09-20T23:59:00+09:00",
+    "resultDueAt": "2026-10-01T09:00:00+09:00",
+    "source": {
+      "name": "首相官邸 公式ウェブサイト",
+      "url": "https://www.kantei.go.jp/"
+    }
+  },
+  {
+    "id": "PRED-20260905-040",
+    "version": 1,
+    "category": "ENTERTAINMENT",
+    "horizon": "SHORT",
+    "question": "2026年9月30日公開のBillboard JAPAN Streaming Songsチャートで1位を獲得する楽曲の再生回数は1,000万回以上か？",
+    "choices": [
+      "1,000万回以上（10,000,000回以上）",
+      "1,000万回未満（9,999,999回以下）"
+    ],
+    "resolutionRule": "Billboard JAPAN公式サイトの2026年9月30日公開「Streaming Songs」週間1位楽曲の週間再生回数（公式公表値）に基づき判定。1,000万回以上なら選択肢a、未満なら選択肢b。未確定時は判定保留。Asia/Tokyo。",
+    "publishAt": "2026-09-07T19:00:00+09:00",
+    "closeAt": "2026-09-29T23:59:00+09:00",
+    "resultDueAt": "2026-09-30T15:00:00+09:00",
+    "source": {
+      "name": "Billboard JAPAN Charts",
+      "url": "https://www.billboard-japan.com/charts/"
+    }
+  },
+  {
+    "id": "PRED-20260905-042",
+    "version": 1,
+    "category": "ARTS",
+    "horizon": "MEDIUM",
+    "question": "映画芸術科学アカデミー（AMPAS）が2026年10月上旬までに公表する第99回アカデミー賞国際長編映画賞部門の各国出品受領リストに日本代表作品が含まれるか？",
+    "choices": [
+      "含まれる（日本代表作品がリストに掲載）",
+      "含まれない（日本代表作品が不掲載、またはリスト公表なし）"
+    ],
+    "resolutionRule": "映画芸術科学アカデミー（AMPAS）公式サイトにおいて2026年10月10日までに公表される第99回アカデミー賞国際長編映画賞資格認定出品作品リストに基づき判定。日本代表作品掲載なら選択肢a、不掲載またはリスト公表なしなら選択肢b。America/Los_Angeles。",
+    "publishAt": "2026-09-07T19:00:00+09:00",
+    "closeAt": "2026-10-01T23:59:00+09:00",
+    "resultDueAt": "2026-10-11T15:00:00+09:00",
+    "source": {
+      "name": "The Oscars",
+      "url": "https://www.oscars.org/oscars"
+    }
+  },
+  {
+    "id": "PRED-20260905-043",
+    "version": 1,
+    "category": "ACADEMIA",
+    "horizon": "MEDIUM",
+    "question": "2026年10月8日にスウェーデン・アカデミー公式から発表される2026年ノーベル文学賞の受賞者の執筆言語は英語またはフランス語か？",
+    "choices": [
+      "英語またはフランス語（English / French）",
+      "それ以外の言語 または 該当者なし"
+    ],
+    "resolutionRule": "ノーベル財団公式サイトにおける2026年ノーベル文学賞公式発表プレスリリース（Biobibliography / announcement）に準拠して判定。公式発表において受賞者の主たる執筆言語・創作言語として「英語（English）」または「フランス語（French）」が明記されている場合は選択肢a、それ以外の言語が明記されている場合または該当者なしの場合は選択肢b。複数言語併記で英語またはフランス語が含まれる場合も選択肢a。延期時は公表時点、未確定時は判定保留。確定発表準拠。",
+    "publishAt": "2026-09-07T19:00:00+09:00",
+    "closeAt": "2026-10-08T18:00:00+09:00",
+    "resultDueAt": "2026-10-08T21:00:00+09:00",
+    "source": {
+      "name": "Nobel Prize",
+      "url": "https://www.nobelprize.org/prizes/"
+    }
+  },
+  {
+    "id": "PRED-20260905-044",
+    "version": 1,
+    "category": "ECONOMY",
+    "horizon": "SHORT",
+    "question": "厚生労働省が2026年10月2日に公表する2026年8月分の全国有効求人倍率（季節調整値）は1.20倍以上か？",
+    "choices": [
+      "1.20倍以上（1.20倍含む）",
+      "1.20倍未満"
+    ],
+    "resolutionRule": "厚生労働省公表の「一般職業紹介状況（2026年8月分）」における、全国の有効求人倍率（季節調整値）公表確定値に基づき判定。1.20倍以上（1.20倍含む）であれば選択肢a、1.20倍未満であれば選択肢b。延期・中止は判定保留。初回公表確定値準拠。",
+    "publishAt": "2026-09-07T19:00:00+09:00",
+    "closeAt": "2026-10-01T23:59:00+09:00",
+    "resultDueAt": "2026-10-02T09:30:00+09:00",
+    "source": {
+      "name": "厚生労働省 報道発表資料（労働市場統計）",
+      "url": "https://www.mhlw.go.jp/stf/houdou/"
+    }
   }
 ]);
