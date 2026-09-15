@@ -8,9 +8,7 @@ on:
         required: true
         default: true
         type: boolean
-  schedule:
-    # Spark runs at :00, :15, :30 and :45 JST. UTC has the same minute value.
-    - cron: "55 * * * *"
+  # Scheduled publication is paused while reality prediction is under development.
 
 permissions:
   contents: write

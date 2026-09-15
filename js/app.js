@@ -62,7 +62,13 @@ const navs = [
   ["home", "⌂", "ホーム", "HOME", "ホーム"],
   ["daily", "◈", "デイリーテスト", "DAILY TEST", "デイリー"],
   ["training", "⠿", "トレーニング", "TRAINING", "訓練"],
-  ["prediction", "◷", "現実予測", "PREDICTION", "予測"],
+  [
+    "prediction",
+    "◷",
+    config.predictionsEnabled ? "現実予測" : "現実予測（開発中）",
+    "PREDICTION",
+    config.predictionsEnabled ? "予測" : "開発中",
+  ],
   ["battle", "⚔", "戦闘実験", "BATTLE", "戦闘"],
   ["characters", "♙", "キャラクター", "CHARACTER", "仲間"],
   ["analyze", "⌁", "被験結果解析", "ANALYZE", "解析"],
@@ -125,7 +131,7 @@ function home() {
   <div class="wide-links"><button class="feature-link" data-action="training"><span class="feature-icon">⠿</span><span><h3>トレーニング</h3><p>気が済むまで、観測しよう。</p></span><span class="arrow">↗</span></button><button class="feature-link" data-action="battle"><span class="feature-icon">⚔</span><span><h3>戦闘実験</h3><p>本日 残り ${player?.battleRemaining ?? "—"} / 5 回</p></span><span class="arrow">↗</span></button></div></div>
   <div class="right-column"><section class="panel chart-panel"><div class="chart-heading"><h2>第六感プロファイル</h2><small>SUBJECT DATA</small></div>${stats ? radar(stats) : '<p class="muted">研究値は接続後に表示されます。</p>'}<div class="stat-strip">${config.senses.map((k) => `<span>${config.labels[k]}<b>${stats?.[k] ?? "—"}</b></span>`).join("")}</div><div class="condition"><span><span class="live-dot"></span>本日のコンディション</span><b>+${Math.round(player?.condition || 0)}</b></div>${button("被験結果を解析する　↗", "analyze", "text-button")}</section>
   <section class="panel character-panel"><img src="${c.image}" alt="${c.name}"><div class="character-copy"><span class="eyebrow">YOUR PARTNER</span><h2>${c.name}</h2><p>${c.job} / LV.${1 + Math.floor((player?.characters[c.id]?.exp || 0) / 60)}<br>得意な第六感：${config.labels[c.primarySense]}</p>${button("キャラクターへ　↗", "characters", "secondary")}</div></section></div></div>
-  <div class="future-strip"><span>◷　REAL PREDICTION <small>現実世界で、直感を記録する。</small></span>${button("予測を見る　→", "prediction", "secondary")}</div>`;
+  <div class="future-strip"><span>◷　REAL PREDICTION <small>${config.predictionsEnabled ? "現実世界で、直感を記録する。" : "現実予測は開発中です。"}</small></span>${button(config.predictionsEnabled ? "予測を見る　→" : "開発中", "prediction", "secondary")}</div>`;
 }
 function labPage(training) {
   const list = local.get("training", []);
@@ -151,6 +157,11 @@ function labPage(training) {
   );
 }
 function future() {
+  if (!config.predictionsEnabled)
+    return (
+      intro("FIELD TEST", "現実予測", "開発中") +
+      `<section class="empty-state"><span class="symbol" aria-hidden="true">◷</span><h2>現実予測は開発中です。</h2><p class="muted">デイリーテストやトレーニングで、今日の直感を記録してみましょう。</p>${button("トレーニングへ　→", "training", "secondary")}</section>`
+    );
   const data = predictionData;
   if (!data)
     return (
@@ -225,7 +236,8 @@ function predictionStateNote(item, selectedChoice, resultChoice) {
       return selectedChoice
         ? `旧記録：${escape(selectedChoice.label)} ／ 結果：${escape(resultChoice?.label || "確認中")}`
         : `結果：${escape(resultChoice?.label || "確認中")}`;
-    if (!item.bet.settledAt) return "結果を確認しています。再接続すると払戻を反映します。";
+    if (!item.bet.settledAt)
+      return "結果を確認しています。再接続すると払戻を反映します。";
     return item.bet.correct
       ? `🎯 的中 / 最終オッズ ${oddsText(item.bet.finalOdds)} / 払戻 +${Number(item.bet.payoutRc || 0).toLocaleString("ja-JP")} RC / 予見 +${Number(item.bet.predictionXp || 0)} XP`
       : `MISS / 最終オッズ ${oddsText(item.bet.finalOdds)} / 払戻 0 RC / +0 XP`;
@@ -239,12 +251,16 @@ function predictionStateNote(item, selectedChoice, resultChoice) {
 
 function predictionCard(item) {
   const draft = predictionDraft(item);
-  const selected = item.state === "open"
-    ? draft.optionId
-    : item.bet?.optionId || item.selection?.optionId;
+  const selected =
+    item.state === "open"
+      ? draft.optionId
+      : item.bet?.optionId || item.selection?.optionId;
   const selectedChoice = item.choices.find((choice) => choice.id === selected);
-  const storedSelectionId = item.bet?.optionId || item.selection?.optionId || null;
-  const storedChoice = item.choices.find((choice) => choice.id === storedSelectionId);
+  const storedSelectionId =
+    item.bet?.optionId || item.selection?.optionId || null;
+  const storedChoice = item.choices.find(
+    (choice) => choice.id === storedSelectionId,
+  );
   const resultChoice = item.choices.find(
     (choice) => choice.id === item.result?.optionId,
   );
@@ -258,23 +274,27 @@ function predictionCard(item) {
   const paidStake = Math.max(0, draft.stakeRc - freeStakeRc);
   const rcDelta = previousPaid - paidStake;
   const insufficient = rcDelta < 0 && -rcDelta > Number(player?.rc || 0);
-  const costText = rcDelta < 0
-    ? `追加消費 ${(-rcDelta).toLocaleString("ja-JP")} RC`
-    : rcDelta > 0
-      ? `返却 +${rcDelta.toLocaleString("ja-JP")} RC`
-      : item.bet
-        ? "残高変動 0 RC"
-        : `残高消費 ${paidStake.toLocaleString("ja-JP")} RC`;
-  const betPanel = item.state === "open" && betting
-    ? `<div class="prediction-bet-panel"><div class="prediction-market-summary"><span>総プール<b>${Number(item.market?.totalStakeRc || 0).toLocaleString("ja-JP")} RC</b></span><span>参加<b>${Number(item.market?.bettorCount || 0).toLocaleString("ja-JP")}</b></span></div><div class="prediction-stake-row"><label>投票RC<input class="prediction-stake-input" data-prediction-key="${item.id}|${item.version}" type="number" inputmode="numeric" min="${betting.minStakeRc}" max="${betting.maxStakeRc}" step="${betting.stakeStepRc}" value="${draft.stakeRc}"></label><div class="prediction-stake-stepper">${button("−10", `prediction-stake-${item.id}-v${item.version}--10`, "secondary", draft.stakeRc <= betting.minStakeRc ? "disabled" : "")}${button("＋10", `prediction-stake-${item.id}-v${item.version}-10`, "secondary", draft.stakeRc >= betting.maxStakeRc ? "disabled" : "")}</div></div><div class="prediction-stake-quick"><button data-action="prediction-stake-set-${item.id}-v${item.version}-10">10</button><button data-action="prediction-stake-set-${item.id}-v${item.version}-100">100</button><button data-action="prediction-stake-set-${item.id}-v${item.version}-500">500</button><button data-action="prediction-stake-set-${item.id}-v${item.version}-1000">1000</button></div><p class="small muted">最初の10 RCは無料。${costText}${insufficient ? " / RC不足" : ""}</p>${button(item.bet ? "投票を更新する" : "この予想に投票する", `prediction-bet-${item.id}-v${item.version}`, "primary", !selected || insufficient ? "disabled" : "")}</div>`
-    : "";
+  const costText =
+    rcDelta < 0
+      ? `追加消費 ${(-rcDelta).toLocaleString("ja-JP")} RC`
+      : rcDelta > 0
+        ? `返却 +${rcDelta.toLocaleString("ja-JP")} RC`
+        : item.bet
+          ? "残高変動 0 RC"
+          : `残高消費 ${paidStake.toLocaleString("ja-JP")} RC`;
+  const betPanel =
+    item.state === "open" && betting
+      ? `<div class="prediction-bet-panel"><div class="prediction-market-summary"><span>総プール<b>${Number(item.market?.totalStakeRc || 0).toLocaleString("ja-JP")} RC</b></span><span>参加<b>${Number(item.market?.bettorCount || 0).toLocaleString("ja-JP")}</b></span></div><div class="prediction-stake-row"><label>投票RC<input class="prediction-stake-input" data-prediction-key="${item.id}|${item.version}" type="number" inputmode="numeric" min="${betting.minStakeRc}" max="${betting.maxStakeRc}" step="${betting.stakeStepRc}" value="${draft.stakeRc}"></label><div class="prediction-stake-stepper">${button("−10", `prediction-stake-${item.id}-v${item.version}--10`, "secondary", draft.stakeRc <= betting.minStakeRc ? "disabled" : "")}${button("＋10", `prediction-stake-${item.id}-v${item.version}-10`, "secondary", draft.stakeRc >= betting.maxStakeRc ? "disabled" : "")}</div></div><div class="prediction-stake-quick"><button data-action="prediction-stake-set-${item.id}-v${item.version}-10">10</button><button data-action="prediction-stake-set-${item.id}-v${item.version}-100">100</button><button data-action="prediction-stake-set-${item.id}-v${item.version}-500">500</button><button data-action="prediction-stake-set-${item.id}-v${item.version}-1000">1000</button></div><p class="small muted">最初の10 RCは無料。${costText}${insufficient ? " / RC不足" : ""}</p>${button(item.bet ? "投票を更新する" : "この予想に投票する", `prediction-bet-${item.id}-v${item.version}`, "primary", !selected || insufficient ? "disabled" : "")}</div>`
+      : "";
   return `<section class="panel prediction-card ${item.state}"><div class="prediction-card-head"><span class="prediction-category">${escape(item.categoryLabel)}</span><span class="prediction-state">${predictionStatus[item.state]}</span></div><h2>${escape(item.question)}</h2><div class="prediction-deadline"><span>受付締切</span><b>${formatJst(item.closeAt)}</b></div><div class="prediction-choices">${item.choices
     .map((choice) => {
       const marketChoice = item.market?.choices?.[choice.id] || {};
       const stored = item.bet?.optionId === choice.id;
       return `<button class="prediction-choice ${selected === choice.id ? "selected" : ""}" data-action="prediction-select-${item.id}-v${item.version}-${choice.id}" aria-pressed="${selected === choice.id}" ${item.state === "open" ? "" : "disabled"}><span>${choice.id}</span><b>${escape(choice.label)}</b><small>${oddsText(marketChoice.odds)} · ${Number(marketChoice.stakeRc || 0).toLocaleString("ja-JP")} RC${stored ? " · 投票済み" : ""}</small></button>`;
     })
-    .join("")}</div>${betPanel}<p class="prediction-note ${item.correct === true ? "correct" : item.correct === false ? "incorrect" : ""}">${stateNote}</p><details class="prediction-rule"><summary>判定方法と情報源</summary><p>${escape(item.resolutionRule)}</p>${sourceUrl ? `<a href="${sourceUrl}" target="_blank" rel="noopener noreferrer">${escape(item.source.name)}　↗</a>` : ""}<p class="small muted">結果確認予定：${formatJst(item.resultDueAt)}</p></details></section>`;
+    .join(
+      "",
+    )}</div>${betPanel}<p class="prediction-note ${item.correct === true ? "correct" : item.correct === false ? "incorrect" : ""}">${stateNote}</p><details class="prediction-rule"><summary>判定方法と情報源</summary><p>${escape(item.resolutionRule)}</p>${sourceUrl ? `<a href="${sourceUrl}" target="_blank" rel="noopener noreferrer">${escape(item.source.name)}　↗</a>` : ""}<p class="small muted">結果確認予定：${formatJst(item.resultDueAt)}</p></details></section>`;
 }
 
 async function predictionTurnstileToken() {
@@ -314,9 +334,15 @@ async function predictionTurnstileToken() {
       appearance: "interaction-only",
       callback: (token) => finish(resolve, token),
       "error-callback": () =>
-        finish(reject, new Error("投票確認に失敗しました。もう一度お試しください。")),
+        finish(
+          reject,
+          new Error("投票確認に失敗しました。もう一度お試しください。"),
+        ),
       "expired-callback": () =>
-        finish(reject, new Error("投票確認の有効期限が切れました。もう一度お試しください。")),
+        finish(
+          reject,
+          new Error("投票確認の有効期限が切れました。もう一度お試しください。"),
+        ),
     });
     setCleanup(() => {
       if (settled) return;
@@ -502,6 +528,7 @@ function archivePage() {
   );
 }
 function predictionArchive() {
+  if (!config.predictionsEnabled) return "";
   const saved = (predictionData?.items || []).filter((item) => item.selection);
   if (!predictionData)
     return `<section class="panel prediction-log"><div><span class="eyebrow">FIELD TEST LOG</span><h2>現実予測の記録</h2><p class="muted">接続すると記録を確認できます。</p></div>${button("再接続", "reconnect", "secondary")}</section>`;
@@ -565,6 +592,7 @@ function welcome() {
   local.set("welcomed", true);
 }
 async function action(name) {
+  if (!config.predictionsEnabled && name.startsWith("prediction-")) return;
   const predictionSelect = name.match(
     /^prediction-select-(PRED-\d{8}-\d{3})-v(\d+)-([A-D])$/,
   );
@@ -898,9 +926,13 @@ document.querySelector("#dialog").addEventListener("cancel", (e) => {
 });
 document.addEventListener("change", (e) => {
   if (e.target.matches?.(".prediction-stake-input")) {
-    const [predictionId, versionText] = String(e.target.dataset.predictionKey || "").split("|");
+    const [predictionId, versionText] = String(
+      e.target.dataset.predictionKey || "",
+    ).split("|");
     const item = predictionData?.items.find(
-      (candidate) => candidate.id === predictionId && candidate.version === Number(versionText),
+      (candidate) =>
+        candidate.id === predictionId &&
+        candidate.version === Number(versionText),
     );
     const betting = predictionData?.betting;
     if (item && betting) {
@@ -975,6 +1007,11 @@ async function connect() {
     render();
     return;
   }
+  if (!config.predictionsEnabled) {
+    setPredictionData(null);
+    render();
+    return;
+  }
   try {
     const feed = await api("/api/predictions");
     setPredictionData(feed.predictions);
@@ -984,10 +1021,10 @@ async function connect() {
   render();
 }
 function setPredictionData(data) {
-  predictionData = data;
+  predictionData = config.predictionsEnabled ? data : null;
   clearTimeout(predictionRefreshTimer);
   predictionRefreshTimer = null;
-  if (!data?.nextChangeAt) return;
+  if (!config.predictionsEnabled || !data?.nextChangeAt) return;
   const delay = Math.max(
     1000,
     Math.min(2147483000, Date.parse(data.nextChangeAt) - serverNow() + 500),
@@ -995,7 +1032,7 @@ function setPredictionData(data) {
   predictionRefreshTimer = setTimeout(refreshPredictionBoundary, delay);
 }
 async function refreshPredictionBoundary() {
-  if (!online) return;
+  if (!online || !config.predictionsEnabled) return;
   if (busy) {
     predictionRefreshTimer = setTimeout(refreshPredictionBoundary, 1000);
     return;

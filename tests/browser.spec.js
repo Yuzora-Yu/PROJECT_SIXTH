@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { config } from "../shared/config.js";
 import { mkdir } from "node:fs/promises";
 async function enter(page) {
   await page.goto("/");
@@ -67,24 +68,34 @@ test("desktop and phone journeys, daily/training, summon, battle, privacy and re
   await page.locator('[data-action="birth-clear"]').click();
   await expect(page.locator("#birth-date")).toHaveValue("");
   await page.goto("/#prediction");
-  await expect(page.getByRole("heading", { name: "現実予測" })).toBeVisible();
-  await expect(page.locator(".prediction-card")).toHaveCount(12);
-  await expect(page.locator("#main")).not.toContainText("開発中");
-  const firstPrediction = page.locator(".prediction-card").first();
-  const firstChoice = firstPrediction.locator(".prediction-choice").first();
-  await firstChoice.click();
-  await expect(firstChoice).toHaveAttribute("aria-pressed", "true");
-  await firstPrediction.getByRole("button", { name: "この予想に投票する" }).click();
-  await expect(firstPrediction).toContainText("現在の投票");
-  await expect(page.locator("#account")).toContainText("320");
-  await page.reload();
-  await expect(
-    page
-      .locator(".prediction-card")
-      .first()
-      .locator(".prediction-choice")
-      .first(),
-  ).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByRole("heading", { name: "現実予測", exact: true })).toBeVisible();
+  if (config.predictionsEnabled) {
+    await expect(page.locator(".prediction-card")).toHaveCount(12);
+    await expect(page.locator("#main")).not.toContainText("開発中");
+    const firstPrediction = page.locator(".prediction-card").first();
+    const firstChoice = firstPrediction.locator(".prediction-choice").first();
+    await firstChoice.click();
+    await expect(firstChoice).toHaveAttribute("aria-pressed", "true");
+    await firstPrediction
+      .getByRole("button", { name: "この予想に投票する" })
+      .click();
+    await expect(firstPrediction).toContainText("現在の投票");
+    await expect(page.locator("#account")).toContainText("320");
+    await page.reload();
+    await expect(
+      page
+        .locator(".prediction-card")
+        .first()
+        .locator(".prediction-choice")
+        .first(),
+    ).toHaveAttribute("aria-pressed", "true");
+  } else {
+    await expect(page.locator(".prediction-card")).toHaveCount(0);
+    await expect(page.locator("#main")).toContainText("現実予測は開発中です。");
+    await expect(page.locator("#navigation")).toContainText(
+      "現実予測（開発中）",
+    );
+  }
   await page.setViewportSize({ width: 390, height: 844 });
   await page.evaluate(() => window.scrollTo(0, 0));
   await page.screenshot({

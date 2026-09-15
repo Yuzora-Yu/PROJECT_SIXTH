@@ -8,7 +8,10 @@ async function session(at = time) {
   const db = localDatabase();
   for (const migration of ["0001_initial.sql", "0002_prediction_betting.sql"])
     db.native.exec(
-      readFileSync(new URL(`../migrations/${migration}`, import.meta.url), "utf8"),
+      readFileSync(
+        new URL(`../migrations/${migration}`, import.meta.url),
+        "utf8",
+      ),
     );
   let turnstileCalls = 0;
   const runtime = {
@@ -18,6 +21,7 @@ async function session(at = time) {
     TURNSTILE_EXPECTED_HOSTNAME: "localhost",
   };
   const dependencies = {
+    predictionsEnabled: true, // Preserve the prediction-engine regression suite.
     fetch: async () => {
       turnstileCalls += 1;
       return Response.json({
@@ -329,7 +333,6 @@ test("prediction betting uses one free 10 RC stake, updates odds and refunds red
   s.db.native.close();
 });
 
-
 test("concurrent prediction bet updates keep the player balance and pool in sync", async () => {
   const s = await session(Date.parse("2026-09-05T04:30:00Z"));
   const first = await call(s, "/api/predictions/PRED-20260905-001/bet", {
@@ -371,9 +374,18 @@ test("concurrent prediction bet updates keep the player balance and pool in sync
        WHERE prediction_id=? AND version=?`,
     )
     .all("PRED-20260905-001", 1);
-  assert.equal(pool.reduce((sum, row) => sum + row.stake_rc, 0), savedBet.stake_rc);
-  assert.equal(pool.reduce((sum, row) => sum + row.bettor_count, 0), 1);
-  assert.equal(pool.find((row) => row.option_id === savedBet.option_id).stake_rc, savedBet.stake_rc);
+  assert.equal(
+    pool.reduce((sum, row) => sum + row.stake_rc, 0),
+    savedBet.stake_rc,
+  );
+  assert.equal(
+    pool.reduce((sum, row) => sum + row.bettor_count, 0),
+    1,
+  );
+  assert.equal(
+    pool.find((row) => row.option_id === savedBet.option_id).stake_rc,
+    savedBet.stake_rc,
+  );
   s.db.native.close();
 });
 
@@ -426,7 +438,6 @@ test("a frozen market snapshot blocks an in-flight bet update without changing R
   s.db.native.close();
 });
 
-
 test("Turnstile fetch is called without an invalid runtime receiver", async () => {
   const s = await session(Date.parse("2026-09-05T04:30:00Z"));
   s.dependencies.fetch = async function () {
@@ -458,8 +469,7 @@ test("Turnstile testing metadata is accepted when the test response omits action
       metadata: { result_with_testing_key: true },
     });
   s.runtime.ENVIRONMENT = "staging";
-  s.runtime.TURNSTILE_SECRET_KEY =
-    "1x0000000000000000000000000000000AA";
+  s.runtime.TURNSTILE_SECRET_KEY = "1x0000000000000000000000000000000AA";
   s.runtime.TURNSTILE_EXPECTED_HOSTNAME = "";
   const accepted = await call(s, "/api/predictions/PRED-20260905-001/bet", {
     version: 1,
@@ -490,8 +500,7 @@ test("Turnstile dummy action is accepted only outside production", async () => {
   assert.equal(rejected.status, 403);
 
   s.runtime.ENVIRONMENT = "staging";
-  s.runtime.TURNSTILE_SECRET_KEY =
-    "1x0000000000000000000000000000000AA";
+  s.runtime.TURNSTILE_SECRET_KEY = "1x0000000000000000000000000000000AA";
   const accepted = await call(s, "/api/predictions/PRED-20260905-001/bet", {
     version: 1,
     optionId: "A",
@@ -500,4 +509,27 @@ test("Turnstile dummy action is accepted only outside production", async () => {
   });
   assert.equal(accepted.status, 200);
   s.db.native.close();
+});
+
+test("development mode preserves existing bets and keeps bootstrap available", async () => {
+  const s = await session(Date.parse("2026-09-05T04:30:00Z"));
+  try {
+    const placed = await call(s, "/api/predictions/PRED-20260905-001/bet", {
+      version: 1, optionId: "A", stakeRc: 100,
+      turnstileToken: "valid-turnstile-token",
+    });
+    assert.equal(placed.status, 200);
+    const before = s.db.native.prepare("SELECT * FROM prediction_bets").all();
+    const ledger = s.db.native.prepare("SELECT * FROM prediction_rc_ledger").all();
+    s.dependencies.predictionsEnabled = false;
+    const bootstrap = await call(s, "/api/bootstrap");
+    assert.equal(bootstrap.status, 200);
+    assert.equal(bootstrap.data.player.rc, placed.data.player.rc);
+    assert.deepEqual(s.db.native.prepare("SELECT * FROM prediction_bets").all(), before);
+    assert.deepEqual(s.db.native.prepare("SELECT * FROM prediction_rc_ledger").all(), ledger);
+    assert.equal((await call(s, "/api/predictions")).status, 409);
+    assert.equal((await call(s, "/api/daily/card/start", {})).status, 200);
+  } finally {
+    s.db.native.close();
+  }
 });

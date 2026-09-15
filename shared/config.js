@@ -1,4 +1,6 @@
 export const config = Object.freeze({
+  // Shared UI/API release switch. Existing prediction records are retained.
+  predictionsEnabled: false,
   gameVersion: "0.5.0",
   testVersion: 1,
   particleRuleVersion: 5,

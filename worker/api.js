@@ -103,7 +103,8 @@ async function claimDailyAccessBonus(db, row, ms) {
 }
 
 function runtimeFrom(input) {
-  if (input?.prepare && typeof input.prepare === "function") return { DB: input };
+  if (input?.prepare && typeof input.prepare === "function")
+    return { DB: input };
   return input || {};
 }
 
@@ -127,10 +128,15 @@ export async function handleApi(
   const env = runtimeFrom(runtime);
   const db = env.DB;
   const deps = { fetch: dependencies.fetch || fetch };
+  // Dependency override is only available to server-side regression tests.
+  const predictionsEnabled =
+    dependencies.predictionsEnabled ?? config.predictionsEnabled;
   const url = new URL(request.url),
     ms = clock();
   let cookie;
   try {
+    if (!predictionsEnabled && /^\/api\/predictions(?:\/|$)/.test(url.pathname))
+      throw new GameError("現実予測は開発中です。", 409);
     if (!db)
       throw new GameError(
         "保存サーバーに接続できません。訓練モードをご利用ください。",
@@ -188,7 +194,10 @@ export async function handleApi(
 
     // Settlement is lazy and idempotent: any normal authenticated request can
     // finalize already-resolved prediction bets without a separate cron.
-    const settlement = await settlePlayerPredictions(db, row, ms);
+    // While under development, keep stored votes and balances untouched.
+    const settlement = predictionsEnabled
+      ? await settlePlayerPredictions(db, row, ms)
+      : { row, player: JSON.parse(row.data) };
     row = settlement.row;
     let p = settlement.player;
 

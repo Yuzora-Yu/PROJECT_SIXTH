@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { config } from "../shared/config.js";
 import { mkdir } from "node:fs/promises";
 
 async function enter(page) {
@@ -213,9 +214,14 @@ test("large text remains readable across primary phone screens", async ({
         await expectReadableLastLine(page.locator(".lab-row p"));
       } else if (route === "analyze") {
         await expectReadableLastLine(page.locator(".profile-section > h2"));
-      } else {
+      } else if (config.predictionsEnabled) {
         await expect(page.locator(".prediction-card").first()).toBeVisible();
         await expectReadableLastLine(page.locator(".prediction-card h2"));
+      } else {
+        await expect(page.locator(".empty-state h2")).toHaveText(
+          "現実予測は開発中です。",
+        );
+        await expect(page.locator(".prediction-card")).toHaveCount(0);
       }
 
       await expectFooterReachableAboveNavigation(
