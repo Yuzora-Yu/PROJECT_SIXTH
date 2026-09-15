@@ -24,6 +24,7 @@
     "predev": "node scripts/prepare-vendor.mjs",
     "pretest": "node scripts/prepare-vendor.mjs",
     "deploy": "npm run predictions:check && npm run check && wrangler deploy",
+    "deploy:paused": "node scripts/verify-paused-predictions.mjs && npm run check && wrangler deploy",
     "test:spark-skill-sync": "npm run spark:sync:check && python -m unittest tests/test_spark_skill_sync.py",
     "spark:sync": "python scripts/sync-spark-skills.py",
     "spark:sync:check": "python scripts/sync-spark-skills.py --check"
