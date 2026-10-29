@@ -1,7 +1,8 @@
 {
+  "services": [{"binding":"YU_ZORA_ERROR_PAGES","service":"yu-zora-main"}],
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "project-sixth",
-  "main": "worker/index.js",
+  "main": "worker/shared-404/index.mjs",
   "compatibility_date": "2026-09-04",
   "compatibility_flags": ["nodejs_compat"],
   "assets": {
